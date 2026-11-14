@@ -47,14 +47,17 @@ const Cart: React.FC = () => {
     if (!code.trim()) return;
     setValidating(true); setCodeError('');
     if (!isSupabaseConfigured) { setCodeError('Discount codes require a connected database.'); setValidating(false); return; }
-    const { data } = await supabase.from('discount_codes').select('*').ilike('code', code.trim()).maybeSingle();
+    // The code table is private; the database checks the one code typed and returns only what we need.
+    const { data, error: rpcErr } = await supabase.rpc('validate_discount_code', { p_code: code.trim(), p_subtotal: totals.subtotal });
     setValidating(false);
-    const d = data as DiscountCode | null;
-    if (!d || !d.is_active) { setCodeError('Invalid or expired code.'); return; }
-    if (d.starts_at && new Date(d.starts_at) > new Date()) { setCodeError('This code is not active yet.'); return; }
-    if (d.ends_at && new Date(d.ends_at) < new Date()) { setCodeError('This code has expired.'); return; }
-    if (d.max_uses && d.used_count >= d.max_uses) { setCodeError('This code has been fully used.'); return; }
-    if (totals.subtotal < d.min_order_amount) { setCodeError(`Minimum order ${formatCurrency(d.min_order_amount, currency)} required.`); return; }
+    if (rpcErr || !data) {
+      const m = rpcErr?.message || '';
+      // Keep our own wording for the "minimum order" case so the amount uses the shop currency.
+      const min = m.match(/Minimum order of ([\d.]+)/);
+      setCodeError(min ? `Minimum order ${formatCurrency(Number(min[1]), currency)} required.` : (m && !/function|schema|permission/i.test(m) ? m : 'Invalid or expired code.'));
+      return;
+    }
+    const d = data as DiscountCode;
     setDiscount(d);
     sessionStorage.setItem('miniblox_discount', JSON.stringify(d));
     success(`Code ${d.code} applied!`);
