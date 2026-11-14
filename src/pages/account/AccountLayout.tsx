@@ -65,7 +65,7 @@ const AccountLayout: React.FC = () => {
           </div>
         </aside>
         <div className="min-w-0">
-          <Outlet />
+          <React.Suspense fallback={<div className="py-16 text-center font-bold text-ink-400">Loading…</div>}><Outlet /></React.Suspense>
         </div>
       </div>
     </div>

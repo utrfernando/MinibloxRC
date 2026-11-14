@@ -328,7 +328,7 @@ const StoreLayout: React.FC = () => {
     <AnnouncementBar />
     <Header />
     <main className="flex-1">
-      <Outlet />
+      <React.Suspense fallback={<div className="py-32 text-center font-bold text-ink-400">Loading…</div>}><Outlet /></React.Suspense>
     </main>
     <Footer />
     {supportBotEnabled && <React.Suspense fallback={null}><SupportBot /></React.Suspense>}

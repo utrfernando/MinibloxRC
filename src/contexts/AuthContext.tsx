@@ -28,7 +28,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [initializing, setInitializing] = useState(true);
   // true while we're fetching the profile of a user who just signed in
   const [profileLoading, setProfileLoading] = useState(false);
-  const loading = initializing || profileLoading;
+  // Only block the UI while we don't know who the user is yet. Background re-fetches (tab refocus,
+  // token refresh) must not flip this to true, or open pages/forms would be replaced by "Loading…".
+  const loading = initializing || (profileLoading && !user);
 
   const fetchProfile = useCallback(async (uid: string) => {
     setProfileLoading(true);

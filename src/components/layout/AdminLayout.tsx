@@ -99,7 +99,7 @@ const AdminLayout: React.FC = () => {
           <Truck size={18} className="ml-auto text-mint-400" />
         </div>
         <main className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">
-          <Outlet />
+          <React.Suspense fallback={<div className="py-20 text-center font-bold text-ink-400">Loading…</div>}><Outlet /></React.Suspense>
         </main>
       </div>
     </div>
