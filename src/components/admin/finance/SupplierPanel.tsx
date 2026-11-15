@@ -112,7 +112,7 @@ export const SupplierPanel: React.FC<{
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="font-display text-xl font-extrabold text-ink-900">Your suppliers</h3>
-        <Link to="/admin/inventory" className="text-xs font-extrabold text-mint-700 hover:underline">Edit suppliers &amp; record purchases →</Link>
+        <Link to="/admin/suppliers" className="text-xs font-extrabold text-mint-700 hover:underline">Manage suppliers →</Link>
       </div>
       {suppliers.length === 0 ? (
         <p className="rounded-4xl border border-dashed border-ink-200 bg-white p-6 text-sm text-ink-500 text-center">No suppliers yet. Add them under Inventory &amp; Suppliers.</p>
@@ -134,6 +134,7 @@ export const SupplierPanel: React.FC<{
                   </div>
                   {owed > 0 ? <Badge color="red">Owed {money(owed)}</Badge> : <Badge color="green">Nothing owed</Badge>}
                 </div>
+                <Link to={`/admin/suppliers/${sp.id}`} className="mt-1 inline-block text-xs font-extrabold text-mint-700 hover:underline">Edit supplier details →</Link>
                 <div className="mt-3 space-y-1">
                   {line(<User size={13} className="text-ink-400" />, sp.contact_person)}
                   {line(<Phone size={13} className="text-ink-400" />, sp.phone)}

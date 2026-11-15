@@ -10,6 +10,8 @@ import { Badge } from '../../components/ui/Badge';
 import { ProductImage as Img } from '../../components/ui/Feedback';
 import { primaryImage } from '../../components/ProductCard';
 import ProductForm from './ProductForm';
+import { useNavigate } from 'react-router-dom';
+import { useAdminSub } from '../../lib/adminRoute';
 import BulkUploadModal from '../../components/admin/BulkUploadModal';
 import { cn } from '../../lib/utils';
 
@@ -25,6 +27,14 @@ const AdminProducts: React.FC = () => {
   const [formOpen, setFormOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
+  const navigate = useNavigate();
+  const sub = useAdminSub();                 // /admin/products/<id>  ·  /admin/products/new
+  useEffect(() => {
+    if (!sub) { setFormOpen(false); return; }
+    if (sub === 'new') { setEditing(null); setFormOpen(true); return; }
+    const p = products.find(x => x.id === sub);
+    if (p) { setEditing(p); setFormOpen(true); }
+  }, [sub, products]);
 
   const load = async () => {
     setLoading(true);
@@ -59,7 +69,7 @@ const AdminProducts: React.FC = () => {
   return (
     <div>
       <AdminHeader title="Products" subtitle={`${products.length} product(s)`}
-        actions={<div className="flex gap-2"><Button variant="outline" onClick={() => setBulkOpen(true)}><Upload size={16} /> Bulk Upload</Button><Button onClick={() => { setEditing(null); setFormOpen(true); }}><Plus size={16} /> Add Product</Button></div>} />
+        actions={<div className="flex gap-2"><Button variant="outline" onClick={() => setBulkOpen(true)}><Upload size={16} /> Bulk Upload</Button><Button onClick={() => navigate('/admin/products/new')}><Plus size={16} /> Add Product</Button></div>} />
       <BulkUploadModal open={bulkOpen} onClose={() => setBulkOpen(false)} onDone={load} />
 
       <div className="flex flex-wrap gap-3 mb-5">
@@ -115,7 +125,7 @@ const AdminProducts: React.FC = () => {
             </Td>
             <Td>
               <div className="flex gap-1">
-                <button onClick={() => { setEditing(p); setFormOpen(true); }} className="p-2 rounded-xl hover:bg-mint-50 text-mint-600" title="Edit"><Pencil size={16} /></button>
+                <button onClick={() => navigate(`/admin/products/${p.id}`)} className="p-2 rounded-xl hover:bg-mint-50 text-mint-600" title="Edit"><Pencil size={16} /></button>
                 {p.status === 'published' && <a href={`/product/${p.id}`} target="_blank" rel="noreferrer" className="p-2 rounded-xl hover:bg-ink-100 text-ink-500" title="View"><Eye size={16} /></a>}
                 {p.status !== 'archived' && <button onClick={() => archive(p)} className="p-2 rounded-xl hover:bg-sunshine-50 text-sunshine-600" title="Archive"><Archive size={16} /></button>}
                 <button onClick={() => remove(p)} className="p-2 rounded-xl hover:bg-red-50 text-red-500" title="Delete"><Trash2 size={16} /></button>
@@ -125,7 +135,7 @@ const AdminProducts: React.FC = () => {
         ))}
       </Table>
 
-      <ProductForm open={formOpen} onClose={() => setFormOpen(false)} product={editing} onSaved={load} />
+      <ProductForm open={formOpen} onClose={() => navigate('/admin/products')} product={editing} onSaved={load} />
     </div>
   );
 };

@@ -51,23 +51,23 @@ export async function loadAttention(currency = 'LKR'): Promise<AttentionItem[]> 
   // ---- supplier purchases ----------------------------------------------------------------------
   const pu: any[] = purchases.data || [];
   const noRef = pu.filter(p => blank(p.reference));
-  push({ key: 'purchase-no-invoice-no', level: 'medium', count: noRef.length, title: 'Shipments without an invoice number', detail: names(noRef.map(p => `${p.supplier?.name || 'Supplier'} (${money(Number(p.total_cost))})`)), to: '/admin/finance?tab=shipments', action: 'Add invoice numbers' });
+  push({ key: 'purchase-no-invoice-no', level: 'medium', count: noRef.length, title: 'Shipments without an invoice number', detail: names(noRef.map(p => `${p.supplier?.name || 'Supplier'} (${money(Number(p.total_cost))})`)), to: '/admin/finance/shipments', action: 'Add invoice numbers' });
   const noFile = pu.filter(p => blank(p.invoice_path));
-  push({ key: 'purchase-no-file', level: 'low', count: noFile.length, title: 'Shipments with no invoice file attached', detail: 'Attach the invoice photo or PDF so you can prove each payment.', to: '/admin/inventory', action: 'Attach in Inventory → Purchases' });
+  push({ key: 'purchase-no-file', level: 'low', count: noFile.length, title: 'Shipments with no invoice file attached', detail: 'Attach the invoice photo or PDF so you can prove each payment.', to: '/admin/inventory/purchases', action: 'Attach in Inventory → Purchases' });
   const noItems = pu.filter(p => !(p.items || []).length);
-  push({ key: 'purchase-no-items', level: 'low', count: noItems.length, title: 'Shipments with no item lines', detail: 'Units are not tracked for these, so the Shipments report cannot show what sold from them.', to: '/admin/finance?tab=shipments', action: 'Open Shipments' });
+  push({ key: 'purchase-no-items', level: 'low', count: noItems.length, title: 'Shipments with no item lines', detail: 'Units are not tracked for these, so the Shipments report cannot show what sold from them.', to: '/admin/finance/shipments', action: 'Open Shipments' });
   const owed = pu.reduce((s, p) => s + Math.max(0, Number(p.total_cost) - Number(p.amount_paid || 0)), 0);
-  push({ key: 'owed-suppliers', level: 'medium', count: owed > 0 ? pu.filter(p => Number(p.total_cost) > Number(p.amount_paid || 0)).length : 0, title: `You still owe suppliers ${money(owed)}`, detail: 'Record each payment, and which partner paid, when you pay.', to: '/admin/finance?tab=suppliers', action: 'Open Suppliers' });
+  push({ key: 'owed-suppliers', level: 'medium', count: owed > 0 ? pu.filter(p => Number(p.total_cost) > Number(p.amount_paid || 0)).length : 0, title: `You still owe suppliers ${money(owed)}`, detail: 'Record each payment, and which partner paid, when you pay.', to: '/admin/finance/suppliers', action: 'Open Suppliers' });
 
   // ---- who paid / who received -----------------------------------------------------------------
   const exp: any[] = expenses.data || [];
-  push({ key: 'expense-no-payer', level: 'high', count: exp.filter(e => blank(e.paid_by)).length, title: 'Expenses with no "Paid by"', detail: 'Nobody is credited for these on the Partners tab.', to: '/admin/finance?tab=expenses', action: 'Open Expenses' });
-  push({ key: 'payment-no-payer', level: 'high', count: (payments.data || []).filter((p: any) => blank(p.paid_by)).length, title: 'Supplier payments with no partner chosen', detail: 'Open the shipment payment history and re-enter them with the partner who paid.', to: '/admin/finance?tab=suppliers', action: 'Open Suppliers' });
+  push({ key: 'expense-no-payer', level: 'high', count: exp.filter(e => blank(e.paid_by)).length, title: 'Expenses with no "Paid by"', detail: 'Nobody is credited for these on the Partners tab.', to: '/admin/finance/expenses', action: 'Open Expenses' });
+  push({ key: 'payment-no-payer', level: 'high', count: (payments.data || []).filter((p: any) => blank(p.paid_by)).length, title: 'Supplier payments with no partner chosen', detail: 'Open the shipment payment history and re-enter them with the partner who paid.', to: '/admin/finance/suppliers', action: 'Open Suppliers' });
   push({ key: 'refund-no-payer', level: 'high', count: (refunds.data || []).filter((r: any) => blank(r.refunded_by)).length, title: 'Refunds with no partner chosen', detail: 'Open the order and re-enter the refund.', to: '/admin/orders', action: 'Open Orders' });
   const expNoRef = exp.filter(e => blank(e.reference));
-  push({ key: 'expense-no-invoice-no', level: 'medium', count: expNoRef.length, title: 'Expenses with no receipt / invoice number', detail: names(expNoRef.map(e => e.description || e.category)), to: '/admin/finance?tab=expenses', action: 'Add numbers' });
-  push({ key: 'payment-no-invoice-no', level: 'medium', count: (payments.data || []).filter((p: any) => blank(p.reference)).length, title: 'Supplier payments with no invoice / slip number', detail: 'Open the shipment, edit its invoice number to fill them in, or add the number when you record the payment.', to: '/admin/finance?tab=suppliers', action: 'Open Suppliers' });
-  push({ key: 'expense-no-file', level: 'low', count: exp.filter(e => blank(e.invoice_path)).length, title: 'Expenses with no receipt attached', detail: names(exp.filter(e => blank(e.invoice_path)).map(e => e.description || e.category)), to: '/admin/finance?tab=expenses', action: 'Attach receipts' });
+  push({ key: 'expense-no-invoice-no', level: 'medium', count: expNoRef.length, title: 'Expenses with no receipt / invoice number', detail: names(expNoRef.map(e => e.description || e.category)), to: '/admin/finance/expenses', action: 'Add numbers' });
+  push({ key: 'payment-no-invoice-no', level: 'medium', count: (payments.data || []).filter((p: any) => blank(p.reference)).length, title: 'Supplier payments with no invoice / slip number', detail: 'Open the shipment, edit its invoice number to fill them in, or add the number when you record the payment.', to: '/admin/finance/suppliers', action: 'Open Suppliers' });
+  push({ key: 'expense-no-file', level: 'low', count: exp.filter(e => blank(e.invoice_path)).length, title: 'Expenses with no receipt attached', detail: names(exp.filter(e => blank(e.invoice_path)).map(e => e.description || e.category)), to: '/admin/finance/expenses', action: 'Attach receipts' });
 
   // ---- orders ----------------------------------------------------------------------------------
   const ord: any[] = orders.data || [];
@@ -100,7 +100,7 @@ export async function loadAttention(currency = 'LKR'): Promise<AttentionItem[]> 
 
   // ---- suppliers -------------------------------------------------------------------------------
   const noContact = (suppliers.data || []).filter((s: any) => blank(s.contact_person) && blank(s.phone) && blank(s.email));
-  push({ key: 'supplier-no-contact', level: 'medium', count: noContact.length, title: 'Suppliers with no contact details', detail: names(noContact.map((s: any) => s.name)), to: '/admin/inventory', action: 'Open Suppliers' });
+  push({ key: 'supplier-no-contact', level: 'medium', count: noContact.length, title: 'Suppliers with no contact details', detail: names(noContact.map((s: any) => s.name)), to: '/admin/suppliers', action: 'Add contact details' });
 
   const rank: Record<Level, number> = { high: 0, medium: 1, low: 2 };
   return out.sort((a, b) => rank[a.level] - rank[b.level]);

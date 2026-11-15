@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams, Link } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { CartProvider } from './contexts/CartContext';
 import { SettingsProvider } from './contexts/SettingsContext';
@@ -44,6 +44,7 @@ const AdminWebsite = lazy(() => import('./pages/admin/AdminWebsite'));
 const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'));
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
 const AdminFinance = lazy(() => import('./pages/admin/AdminFinance'));
+const AdminSuppliers = lazy(() => import('./pages/admin/AdminSuppliers'));
 
 const PageLoading: React.FC = () => <div className="flex-1 flex items-center justify-center py-32 text-ink-400 font-bold">Loading…</div>;
 
@@ -73,13 +74,21 @@ const AdminSection: React.FC = () => {
     case 'orders': return <AdminOrders />;
     case 'users': return <AdminUsers />;
     case 'finance': return <AdminFinance />;
+    case 'suppliers': return <AdminSuppliers />;
     case 'customers': return <AdminCustomers />;
     case 'discounts': return <AdminDiscounts />;
     case 'promotions': return <AdminPromotions />;
     case 'messages': return <AdminMessages />;
     case 'website': return <AdminWebsite />;
     case 'settings': return <AdminSettings />;
-    default: return <AdminOverview />;
+    case '': return <AdminOverview />;
+    default: return (
+      <div className="py-24 text-center">
+        <p className="font-display text-2xl font-extrabold text-ink-900">That admin page doesn't exist</p>
+        <p className="mt-1 text-sm text-ink-500">The link may be old or mistyped.</p>
+        <Link to="/admin" className="mt-4 inline-block rounded-full bg-mint-500 px-5 py-2 text-sm font-extrabold text-white">Back to Overview</Link>
+      </div>
+    );
   }
 };
 

@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, ArrowUpFromLine, Package, Truck } from 'lucide-react';
 import { InvoiceControl } from '../../components/admin/InvoiceControl';
 import { PARTNERS, IMPORT_CATEGORY } from '../../lib/finance';
+import { useNavigate } from 'react-router-dom';
+import { useAdminSub } from '../../lib/adminRoute';
 import { EditPurchaseModal } from '../../components/admin/EditPurchaseModal';
 import { PaymentBadge, PaymentModal, owedOn, type PurchasePay } from '../../components/admin/finance/SupplierPanel';
 import { supabase, PRODUCT_COSTS_EMBED, withCosts, formatCurrency, formatDate, type Product, type InventoryTransaction, type Purchase, type Supplier } from '../../lib/supabase';
@@ -20,7 +22,12 @@ type Tab = 'overview' | 'transactions' | 'purchases' | 'suppliers';
 const AdminInventory: React.FC = () => {
   const { currency } = useSettings();
   const { authUserId } = useAuth();
-  const [tab, setTab] = useState<Tab>('overview');
+  const navigate = useNavigate();
+  const sub = useAdminSub();
+  // /admin/inventory  ·  /admin/inventory/history  ·  /admin/inventory/purchases   (suppliers have their own page)
+  const tab: Tab = sub === 'history' ? 'transactions' : sub === 'purchases' ? 'purchases' : 'overview';
+  const setTab = (t: Tab) => navigate(t === 'suppliers' ? '/admin/suppliers' : t === 'transactions' ? '/admin/inventory/history' : t === 'purchases' ? '/admin/inventory/purchases' : '/admin/inventory');
+  useEffect(() => { if (sub === 'suppliers') navigate('/admin/suppliers', { replace: true }); }, [sub, navigate]);
   const [products, setProducts] = useState<Product[]>([]);
   const [txns, setTxns] = useState<InventoryTransaction[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
@@ -29,7 +36,6 @@ const AdminInventory: React.FC = () => {
   const [purchaseModal, setPurchaseModal] = useState(false);
   const [payFor, setPayFor] = useState<PurchasePay | null>(null);
   const [editPurchase, setEditPurchase] = useState<PurchasePay | null>(null);
-  const [supplierModal, setSupplierModal] = useState(false);
   const load = async () => {
     const [p, t, pu, s] = await Promise.all([
       supabase.from('products').select('*, category:categories(*), ' + PRODUCT_COSTS_EMBED),
@@ -150,29 +156,11 @@ const AdminInventory: React.FC = () => {
         </div>
       )}
 
-      {tab === 'suppliers' && (
-        <div className="space-y-4">
-          <div className="flex justify-end"><Button onClick={() => setSupplierModal(true)}><Plus size={16} /> Add Supplier</Button></div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {suppliers.map(s => (
-              <div key={s.id} className="rounded-4xl border border-ink-100 bg-white p-5 shadow-soft">
-                <p className="font-display font-bold text-ink-900">{s.name}</p>
-                {s.contact_person && <p className="text-sm text-ink-500">{s.contact_person}</p>}
-                {s.phone && <p className="text-sm text-ink-500">{s.phone}</p>}
-                {s.email && <p className="text-sm text-mint-600">{s.email}</p>}
-                {s.address && <p className="text-xs text-ink-400 mt-1">{s.address}</p>}
-              </div>
-            ))}
-          </div>
-          {suppliers.length === 0 && <p className="text-ink-400 font-bold text-center py-10">No suppliers yet.</p>}
-        </div>
-      )}
 
       <AdjustModal product={adjustFor} onClose={() => setAdjustFor(null)} onSaved={() => { setAdjustFor(null); load(); }} />
       <EditPurchaseModal purchase={editPurchase} suppliers={suppliers} onClose={() => setEditPurchase(null)} onSaved={() => { setEditPurchase(null); load(); }} />
       <PaymentModal purchase={payFor} money={n => formatCurrency(n, currency)} onClose={() => setPayFor(null)} onSaved={() => { setPayFor(null); load(); }} />
       <PurchaseModal open={purchaseModal} onClose={() => setPurchaseModal(false)} products={products} suppliers={suppliers} existingRefs={purchases.map(p => (p.reference || '').trim().toLowerCase()).filter(Boolean)} userId={authUserId} onSaved={() => { setPurchaseModal(false); load(); }} />
-      <SupplierModal open={supplierModal} onClose={() => setSupplierModal(false)} onSaved={() => { setSupplierModal(false); load(); }} />
     </div>
   );
 };
@@ -365,33 +353,5 @@ const PurchaseModal: React.FC<{ open: boolean; onClose: () => void; products: Pr
 };
 
 const TrashIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>;
-
-const SupplierModal: React.FC<{ open: boolean; onClose: () => void; onSaved: () => void }> = ({ open, onClose, onSaved }) => {
-  const { success, error } = useToast();
-  const [form, setForm] = useState({ name: '', contact_person: '', phone: '', email: '', address: '', notes: '' });
-  const [saving, setSaving] = useState(false);
-  const save = async () => {
-    if (!form.name.trim()) { error('Name required'); return; }
-    setSaving(true);
-    const { error: e } = await supabase.from('suppliers').insert(form);
-    setSaving(false);
-    if (e) error(e.message); else { success('Supplier added'); setForm({ name: '', contact_person: '', phone: '', email: '', address: '', notes: '' }); onSaved(); }
-  };
-  return (
-    <Modal open={open} onClose={onClose} title="Add Supplier">
-      <div className="space-y-4">
-        <Field label="Company Name"><Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></Field>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="Contact Person"><Input value={form.contact_person} onChange={e => setForm({ ...form, contact_person: e.target.value })} /></Field>
-          <Field label="Phone"><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></Field>
-        </div>
-        <Field label="Email"><Input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></Field>
-        <Field label="Address"><Input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} /></Field>
-        <Field label="Notes"><Textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} className="min-h-[60px]" /></Field>
-        <div className="flex justify-end gap-3"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button onClick={save} loading={saving}>Save</Button></div>
-      </div>
-    </Modal>
-  );
-};
 
 export default AdminInventory;

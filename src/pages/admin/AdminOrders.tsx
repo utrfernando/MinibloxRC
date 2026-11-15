@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Search, Eye, CheckCircle2, Printer, MessageCircle } from 'lucide-react';
 import { printOrderInvoice, whatsappLink, PARTNERS, type Refund } from '../../lib/finance';
+import { useNavigate } from 'react-router-dom';
+import { useAdminSub } from '../../lib/adminRoute';
 import { supabase, openReceipt, formatCurrency, formatDate, ORDER_STATUS_LABELS, ORDER_STATUS_STYLES, type Order, type OrderStatus } from '../../lib/supabase';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -24,6 +26,9 @@ const AdminOrders: React.FC = () => {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [selected, setSelected] = useState<Order | null>(null);
+  const navigate = useNavigate();
+  const orderId = useAdminSub();            // /admin/orders/<order id>
+  const closeOrder = () => navigate('/admin/orders');
 
   const load = async () => {
     setLoading(true);
@@ -50,10 +55,12 @@ const AdminOrders: React.FC = () => {
     return orders.filter(o => o.order_number.toLowerCase().includes(s) || o.customer_name.toLowerCase().includes(s) || o.phone.includes(s) || o.email.toLowerCase().includes(s));
   }, [orders, q]);
 
-  const openOrder = async (o: Order) => {
-    const { data } = await supabase.from('orders').select('*, items:order_items(*), payments:payments(*)').eq('id', o.id).single();
-    setSelected(data as Order);
-  };
+  const openOrder = (o: Order) => navigate(`/admin/orders/${o.id}`);
+  useEffect(() => {
+    if (!orderId) { setSelected(null); return; }
+    supabase.from('orders').select('*, items:order_items(*), payments:payments(*)').eq('id', orderId).maybeSingle()
+      .then(({ data }) => setSelected((data as Order) || null));
+  }, [orderId]);
 
   const updateStatus = async (o: Order, status: OrderStatus) => {
     const patch: any = { status };
@@ -74,7 +81,7 @@ const AdminOrders: React.FC = () => {
       }
     }
     success(`Order marked ${ORDER_STATUS_LABELS[status]}`);
-    setSelected(null); load();
+    closeOrder(); load();
   };
 
   const verifyPayment = async (o: Order) => {
@@ -83,7 +90,7 @@ const AdminOrders: React.FC = () => {
     const { error: e } = await supabase.from('payments').update({ status: 'paid', verified_by: authUserId, verified_at: new Date().toISOString(), paid_at: new Date().toISOString() }).eq('id', payment.id);
     if (!e) {
       await supabase.from('orders').update({ payment_status: 'paid' }).eq('id', o.id);
-      success('Payment verified'); setSelected(null); load();
+      success('Payment verified'); closeOrder(); load();
     } else error(e.message);
   };
 
@@ -94,7 +101,7 @@ const AdminOrders: React.FC = () => {
     if (e) { error(e.message); return; }
     const payment = o.payments?.[0];
     if (payment) await supabase.from('payments').update(paid ? { status: 'paid', paid_at: now, verified_by: authUserId, verified_at: now } : { status: 'pending', paid_at: null }).eq('id', payment.id);
-    success(paid ? 'Marked as paid' : 'Marked as not paid'); setSelected(null); load();
+    success(paid ? 'Marked as paid' : 'Marked as not paid'); closeOrder(); load();
   };
 
   return (
@@ -131,7 +138,7 @@ const AdminOrders: React.FC = () => {
         ))}
       </Table>
 
-      <OrderModal order={selected} onClose={() => setSelected(null)} onStatus={updateStatus} onVerify={verifyPayment} onSetPaid={setPaid} />
+      <OrderModal order={selected} onClose={closeOrder} onStatus={updateStatus} onVerify={verifyPayment} onSetPaid={setPaid} />
     </div>
   );
 };

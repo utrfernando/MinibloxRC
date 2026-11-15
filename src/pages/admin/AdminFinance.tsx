@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAdminSub } from '../../lib/adminRoute';
 import { Banknote, TrendingUp, Receipt, Wallet, Boxes, Truck, Plus, Download, Trash2, AlertTriangle, Pencil, Paperclip } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend, PieChart, Pie, Cell } from 'recharts';
 import { InvoiceControl } from '../../components/admin/InvoiceControl';
@@ -60,9 +61,12 @@ const AdminFinance: React.FC = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [purchases, setPurchases] = useState<PurchasePay[]>([]);
   const [params] = useSearchParams();
-  const [tab, setTab] = useState<Tab>(() => (TABS.some(t => t.k === params.get('tab')) ? (params.get('tab') as Tab) : 'overview'));
-  // opened from a link (e.g. the alert bell) while already on this page
-  useEffect(() => { const t = params.get('tab'); if (t && TABS.some(x => x.k === t)) setTab(t as Tab); }, [params]);
+  const navigate = useNavigate();
+  const sub = useAdminSub();
+  // each tab has its own address: /admin/finance, /admin/finance/partners, … (the old ?tab= links still work)
+  const wanted = sub || params.get('tab') || 'overview';
+  const tab: Tab = TABS.some(t => t.k === wanted) ? (wanted as Tab) : 'overview';
+  const setTab = (t: Tab) => navigate(t === 'overview' ? '/admin/finance' : `/admin/finance/${t}`);
   const [txs, setTxs] = useState<PartnerTx[]>([]);
   const [orderCosts, setOrderCosts] = useState<OrderCost[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);

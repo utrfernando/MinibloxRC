@@ -4,7 +4,7 @@ import { AttentionBell } from '../admin/AttentionBell';
 import {
   LayoutDashboard, Package, FolderTree, Boxes, ShoppingCart, Users,
   TicketPercent, Image as ImageIcon, Globe, Settings, MessageSquare,
-  Blocks, ArrowLeft, Menu, Wallet, ShieldCheck,
+  Blocks, ArrowLeft, Menu, Wallet, ShieldCheck, Truck,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useSettings } from '../../contexts/SettingsContext';
@@ -16,7 +16,8 @@ const NAV_GROUPS = [
   { title: 'Products', items: [
     { to: '/admin/products', label: 'Products', icon: Package },
     { to: '/admin/categories', label: 'Categories', icon: FolderTree },
-    { to: '/admin/inventory', label: 'Inventory & Suppliers', icon: Boxes },
+    { to: '/admin/inventory', label: 'Inventory & Purchases', icon: Boxes },
+    { to: '/admin/suppliers', label: 'Suppliers', icon: Truck },
   ] },
   { title: 'Sales', items: [
     { to: '/admin/orders', label: 'Orders', icon: ShoppingCart },
