@@ -31,7 +31,7 @@ export const PaymentModal: React.FC<{ purchase: PurchasePay | null; money: (n: n
   const [method, setMethod] = useState('bank');
   const [reference, setReference] = useState('');
   const [saving, setSaving] = useState(false);
-  React.useEffect(() => { if (purchase) { setAmount(String(owedOn(purchase))); setPaidBy(''); setReference(''); } }, [purchase]);
+  React.useEffect(() => { if (purchase) { setAmount(String(owedOn(purchase))); setPaidBy(''); setReference(purchase.reference || ''); } }, [purchase]);
   if (!purchase) return null;
   const owed = owedOn(purchase);
 
@@ -56,7 +56,7 @@ export const PaymentModal: React.FC<{ purchase: PurchasePay | null; money: (n: n
         <Field label="Payment date"><Input type="date" value={date} onChange={e => setDate(e.target.value)} /></Field>
         <Field label="Paid by (from own pocket)"><Select value={paidBy} onChange={e => setPaidBy(e.target.value)}><option value="">Select…</option>{PARTNERS.map(p => <option key={p}>{p}</option>)}</Select></Field>
         <Field label="Method"><Select value={method} onChange={e => setMethod(e.target.value)}><option value="bank">Bank transfer</option><option value="cash">Cash</option><option value="card">Card</option><option value="other">Other</option></Select></Field>
-        <div className="sm:col-span-2"><Field label="Reference (optional)"><Input value={reference} onChange={e => setReference(e.target.value)} placeholder="Transfer slip no., Alibaba order no." /></Field></div>
+        <div className="sm:col-span-2"><Field label="Invoice / order no." hint="Filled in from the purchase; change it if this payment has its own slip number"><Input value={reference} onChange={e => setReference(e.target.value)} placeholder="Invoice no., transfer slip no." /></Field></div>
       </div>
       <div className="flex justify-end gap-2 mt-5"><Button variant="ghost" onClick={onClose}>Cancel</Button><Button loading={saving} onClick={save}>Save payment</Button></div>
     </Modal>
@@ -174,7 +174,7 @@ export const SupplierPanel: React.FC<{
         <h3 className="font-display text-xl font-extrabold text-ink-900">Purchases</h3>
         <label className="flex items-center gap-2 text-xs font-bold text-ink-500 cursor-pointer"><input type="checkbox" checked={showPaid} onChange={e => setShowPaid(e.target.checked)} className="accent-teal-500" /> Show fully paid</label>
       </div>
-      <Table head={['Date', 'Supplier', 'Reference', 'Total', 'Paid', 'Owed', 'Status', '']}>
+      <Table head={['Date', 'Supplier', 'Invoice no.', 'Total', 'Paid', 'Owed', 'Status', '']}>
         {rows.length === 0 ? <tr><Td className="text-center py-8 text-ink-400">No outstanding purchases.</Td></tr> : rows.map(p => (
           <tr key={p.id} className="hover:bg-ink-50/50">
             <Td className="text-xs text-ink-500">{formatDate(p.purchase_date)}</Td>

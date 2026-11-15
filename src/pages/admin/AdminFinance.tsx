@@ -16,12 +16,13 @@ import { BudgetsPanel } from '../../components/admin/finance/BudgetsPanel';
 import { RecurringPanel } from '../../components/admin/finance/RecurringPanel';
 import { SupplierPanel, owedOn, type PurchasePay } from '../../components/admin/finance/SupplierPanel';
 import { ProfitPanel } from '../../components/admin/finance/ProfitPanel';
+import { ShipmentsPanel } from '../../components/admin/finance/ShipmentsPanel';
 import { RecordsPanel } from '../../components/admin/finance/RecordsPanel';
 
-type Tab = 'overview' | 'expenses' | 'partners' | 'suppliers' | 'profit' | 'records';
+type Tab = 'overview' | 'expenses' | 'partners' | 'suppliers' | 'shipments' | 'profit' | 'records';
 const TABS: { k: Tab; l: string }[] = [
   { k: 'overview', l: 'Overview' }, { k: 'expenses', l: 'Expenses' }, { k: 'partners', l: 'Partners' },
-  { k: 'suppliers', l: 'Suppliers' }, { k: 'profit', l: 'Profit reports' }, { k: 'records', l: 'Records & backup' },
+  { k: 'suppliers', l: 'Suppliers' }, { k: 'shipments', l: 'Shipments' }, { k: 'profit', l: 'Profit reports' }, { k: 'records', l: 'Records & backup' },
 ];
 
 const COLORS = ['#14b8a6', '#f59e0b', '#8b5cf6', '#fb923c', '#2dd4bf', '#fbbf24', '#a78bfa', '#ef4444', '#64748b', '#10b981'];
@@ -82,7 +83,7 @@ const AdminFinance: React.FC = () => {
       supabase.from('orders').select('*, items:order_items(*)').order('placed_at', { ascending: false }),
       supabase.from('products').select('id,name,stock_quantity,category_id,' + PRODUCT_COSTS_EMBED),
       supabase.from('expenses').select('*').order('expense_date', { ascending: false }),
-      supabase.from('purchases').select('*, supplier:suppliers(*)').order('purchase_date', { ascending: false }),
+      supabase.from('purchases').select('*, supplier:suppliers(*), items:purchase_items(*)').order('purchase_date', { ascending: false }),
       supabase.from('partner_transactions').select('*').order('tx_date', { ascending: false }),
       supabase.from('order_costs').select('*'),
       supabase.from('expense_budgets').select('*'),
@@ -357,6 +358,7 @@ const AdminFinance: React.FC = () => {
 
         {tab === 'partners' && <PartnersPanel txs={txs} expenses={expenses} supplierPayments={purchasePayments} refunds={refunds} salesHeld={salesHeld} money={money} reload={load} />}
         {tab === 'suppliers' && <SupplierPanel purchases={purchases} payments={purchasePayments} suppliers={suppliers} productCounts={productCounts} goodsExpenseTotal={f.stockExpenseTotal} money={money} reload={load} />}
+        {tab === 'shipments' && <ShipmentsPanel purchases={purchases as any} orders={orders} products={products} money={money} />}
         {tab === 'profit' && <ProfitPanel orders={f.valid} products={products as any} categories={categories} orderCosts={orderCosts} itemCosts={itemCosts} refunds={refunds} money={money} />}
         {tab === 'records' && <RecordsPanel locks={locks} orders={orders} products={products} expenses={expenses} txs={txs} purchases={purchases} orderCosts={orderCosts} itemCosts={itemCosts} refunds={refunds} purchasePayments={purchasePayments} reload={load} />}
       </>}

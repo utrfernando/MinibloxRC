@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Trash2, Upload, Star, Sparkles, Image as ImageIcon } from 'lucide-react';
 import { optimizeImage, IMAGE_CACHE } from '../../lib/image';
+import { ProductPurchaseHistory } from '../../components/admin/ProductPurchaseHistory';
 import { supabase, type Product, type Category, type Supplier } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
@@ -173,6 +174,8 @@ const ProductForm: React.FC<Props> = ({ open, onClose, product, onSaved }) => {
             <Field label="Low Stock Alert At"><Input type="number" {...register('low_stock_threshold')} /></Field>
           </div>
         </div>
+
+        {product?.id && <div className="md:col-span-2"><ProductPurchaseHistory productId={product.id} currency="LKR" /></div>}
 
         {/* Flags */}
         <div className="md:col-span-2 flex flex-wrap gap-3">

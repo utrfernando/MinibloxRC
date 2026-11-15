@@ -167,7 +167,7 @@ const AdminInventory: React.FC = () => {
 
       <AdjustModal product={adjustFor} onClose={() => setAdjustFor(null)} onSaved={() => { setAdjustFor(null); load(); }} />
       <PaymentModal purchase={payFor} money={n => formatCurrency(n, currency)} onClose={() => setPayFor(null)} onSaved={() => { setPayFor(null); load(); }} />
-      <PurchaseModal open={purchaseModal} onClose={() => setPurchaseModal(false)} products={products} suppliers={suppliers} userId={authUserId} onSaved={() => { setPurchaseModal(false); load(); }} />
+      <PurchaseModal open={purchaseModal} onClose={() => setPurchaseModal(false)} products={products} suppliers={suppliers} existingRefs={purchases.map(p => (p.reference || '').trim().toLowerCase()).filter(Boolean)} userId={authUserId} onSaved={() => { setPurchaseModal(false); load(); }} />
       <SupplierModal open={supplierModal} onClose={() => setSupplierModal(false)} onSaved={() => { setSupplierModal(false); load(); }} />
     </div>
   );
@@ -237,7 +237,7 @@ const AdjustModal: React.FC<{ product: Product | null; onClose: () => void; onSa
 };
 
 // ------------------------------------------------------------------
-const PurchaseModal: React.FC<{ open: boolean; onClose: () => void; products: Product[]; suppliers: Supplier[]; userId: string | null; onSaved: () => void }> = ({ open, onClose, products, suppliers, userId, onSaved }) => {
+const PurchaseModal: React.FC<{ open: boolean; onClose: () => void; products: Product[]; suppliers: Supplier[]; existingRefs: string[]; userId: string | null; onSaved: () => void }> = ({ open, onClose, products, suppliers, existingRefs, userId, onSaved }) => {
   const { success, error } = useToast();
   const [reference, setReference] = useState('');
   const [supplierId, setSupplierId] = useState('');
@@ -258,12 +258,14 @@ const PurchaseModal: React.FC<{ open: boolean; onClose: () => void; products: Pr
   const save = async () => {
     const valid = rows.filter(r => r.product_id && r.quantity > 0);
     if (!valid.length) { error('Add at least one item'); return; }
+    if (!reference.trim()) { error('Enter the supplier invoice / order number — it links this shipment to its payments and products.'); return; }
+    if (existingRefs.includes(reference.trim().toLowerCase()) && !confirm(`A purchase with invoice no. "${reference.trim()}" already exists. Record this one anyway?`)) return;
     const paid = Math.min(Math.max(0, Number(paidNow) || 0), total);
     if (paid > 0 && !paidBy) { error('Choose which partner paid the supplier.'); return; }
     if (extra > 0 && !importPaidBy) { error('Choose which partner paid the freight / customs.'); return; }
     setSaving(true);
     const { data: purchase, error: e } = await supabase.from('purchases').insert({
-      supplier_id: supplierId || null, reference: reference || null, purchase_date: date,
+      supplier_id: supplierId || null, reference: reference.trim(), purchase_date: date,
       total_cost: total, notes: notes || null, created_by: userId,
       ...(extra > 0 ? { extra_costs: extra } : {}),
     }).select('id').single();
@@ -272,7 +274,7 @@ const PurchaseModal: React.FC<{ open: boolean; onClose: () => void; products: Pr
 
     // Supplier payment (who paid is kept, so the Partners tab credits them)
     if (paid > 0) {
-      const { error: pe } = await supabase.from('purchase_payments').insert({ purchase_id: purchase.id, pay_date: date, amount: paid, paid_by: paidBy, method: payMethod, created_by: userId });
+      const { error: pe } = await supabase.from('purchase_payments').insert({ purchase_id: purchase.id, pay_date: date, amount: paid, paid_by: paidBy, method: payMethod, reference: reference.trim(), created_by: userId });
       if (pe) error('Purchase saved, but the payment was not recorded: ' + pe.message);
     }
     // Freight / customs: money out (credited to the partner) AND added into each product's landed cost.
@@ -315,7 +317,7 @@ const PurchaseModal: React.FC<{ open: boolean; onClose: () => void; products: Pr
     <Modal open={open} onClose={onClose} title="Record Purchase" wide>
       <div className="space-y-4">
         <div className="grid sm:grid-cols-3 gap-4">
-          <Field label="Reference"><Input value={reference} onChange={e => setReference(e.target.value)} placeholder="PO-001" /></Field>
+          <Field label="Invoice / order no. *" hint="From the supplier invoice or Alibaba order"><Input value={reference} onChange={e => setReference(e.target.value)} placeholder="e.g. 29909937501030126" /></Field>
           <Field label="Supplier">
             <Select value={supplierId} onChange={e => setSupplierId(e.target.value)}><option value="">—</option>{suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</Select>
           </Field>
