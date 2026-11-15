@@ -6,7 +6,7 @@ import { Input, Select, Field } from '../ui/Input';
 import { useToast } from '../../contexts/ToastContext';
 import { readSheet, parseRows, runImport, type ImportOptions, type ParsedRow, type ImportResult } from '../../lib/bulkImport';
 
-const DEFAULTS: ImportOptions = { exchangeRate: 0, markupPercent: 0, defaultStatus: 'draft', existing: 'update', createMissing: true };
+const DEFAULTS: ImportOptions = { exchangeRate: 0, markupPercent: 0, defaultStatus: 'draft', existing: 'update', createMissing: true, invoiceNo: '' };
 
 const BulkUploadModal: React.FC<{ open: boolean; onClose: () => void; onDone: () => void }> = ({ open, onClose, onDone }) => {
   const { success, error } = useToast();
@@ -77,6 +77,12 @@ const BulkUploadModal: React.FC<{ open: boolean; onClose: () => void; onDone: ()
           </div>
 
           <div className="grid sm:grid-cols-2 gap-4">
+            <div className="sm:col-span-2">
+              <Field label="Supplier invoice / order no. for this upload" hint="Saved on every product in this file that has no invoice_no column of its own">
+                <Input value={opt.invoiceNo} onChange={e => set('invoiceNo', e.target.value)} placeholder="e.g. 29909937501030126" />
+              </Field>
+              {parsed && parsed.rows.some(r => !r.invoice_no) && <p className="mt-1 text-xs font-bold text-red-500">{parsed.rows.filter(r => !r.invoice_no).length} product(s) have no invoice number — they will be flagged as missing one.</p>}
+            </div>
             <Field label="Exchange rate (1 USD = ?)"><Input type="number" min="0" step="0.01" value={opt.exchangeRate || ''} onChange={e => set('exchangeRate', Number(e.target.value))} placeholder="Needed for US$ costs" /></Field>
             <Field label="Markup % (when selling price is blank)"><Input type="number" min="0" step="1" value={opt.markupPercent || ''} onChange={e => set('markupPercent', Number(e.target.value))} placeholder="e.g. 80" /></Field>
             <Field label="Status for new products">
@@ -107,11 +113,11 @@ const BulkUploadModal: React.FC<{ open: boolean; onClose: () => void; onDone: ()
               <p className="text-sm text-ink-700"><b>{okRows.length}</b> ready{badRows.length > 0 && <>, <b className="text-red-600">{badRows.length}</b> with errors (they will be skipped)</>}. Header found on row {parsed.headerLine}.</p>
               <div className="max-h-64 overflow-auto rounded-2xl border border-ink-100">
                 <table className="w-full text-xs">
-                  <thead className="bg-ink-50 sticky top-0"><tr className="text-left text-ink-500"><th className="p-2">Row</th><th className="p-2">SKU</th><th className="p-2">Name</th><th className="p-2">Cost</th><th className="p-2">Price</th><th className="p-2">Qty</th><th className="p-2">Notes</th></tr></thead>
+                  <thead className="bg-ink-50 sticky top-0"><tr className="text-left text-ink-500"><th className="p-2">Row</th><th className="p-2">SKU</th><th className="p-2">Name</th><th className="p-2">Invoice no.</th><th className="p-2">Cost</th><th className="p-2">Price</th><th className="p-2">Qty</th><th className="p-2">Notes</th></tr></thead>
                   <tbody>
                     {parsed.rows.map(r => (
                       <tr key={r.line} className="border-t border-ink-100 align-top">
-                        <td className="p-2">{r.line}</td><td className="p-2 font-mono">{r.sku || '—'}</td><td className="p-2">{r.name}</td>
+                        <td className="p-2">{r.line}</td><td className="p-2 font-mono">{r.sku || '—'}</td><td className="p-2">{r.name}</td><td className="p-2">{r.invoice_no || <span className="font-bold text-red-500">missing</span>}</td>
                         <td className="p-2">{r.supplier_cost}</td><td className="p-2">{r.selling_price}</td><td className="p-2">{r.stock_quantity}</td>
                         <td className="p-2">
                           {r.errors.map((m, i) => <p key={i} className="text-red-600 flex gap-1"><AlertTriangle size={12} className="mt-0.5 shrink-0" />{m}</p>)}

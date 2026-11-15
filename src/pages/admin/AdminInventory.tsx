@@ -125,7 +125,7 @@ const AdminInventory: React.FC = () => {
             <div key={pu.id} className="rounded-4xl border border-ink-100 bg-white p-5 shadow-soft">
               <div className="flex flex-wrap justify-between gap-2 mb-3">
                 <div>
-                  <p className="font-display font-bold text-ink-900">{pu.reference || 'Purchase'} · {formatDate(pu.purchase_date)}</p>
+                  <p className="font-display font-bold text-ink-900">{pu.reference || <span className="text-red-500">No invoice no.</span>} · {formatDate(pu.purchase_date)}</p>
                   <p className="text-xs text-ink-400">{pu.supplier?.name || 'No supplier'} · {pu.items?.length || 0} item(s)</p>
                 </div>
                 <div className="text-right space-y-1">

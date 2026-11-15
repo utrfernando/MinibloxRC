@@ -89,7 +89,7 @@ const AdminProducts: React.FC = () => {
                 <div className="w-12 h-12 rounded-2xl overflow-hidden shrink-0"><Img src={primaryImage(p)} alt="" iconClassName="w-6 h-6" /></div>
                 <div className="min-w-0">
                   <p className="font-bold text-ink-900 truncate max-w-[220px]">{p.name}</p>
-                  <p className="text-xs text-ink-400">{p.sku || '—'}</p>
+                  <p className="text-xs text-ink-400">{p.sku || '—'}{!(p.invoice_no || '').trim() && <span className="ml-2 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-extrabold text-red-500">no invoice no.</span>}</p>
                 </div>
               </div>
             </Td>

@@ -21,8 +21,8 @@ export async function loadAttention(currency = 'LKR'): Promise<AttentionItem[]> 
   const money = (n: number) => formatCurrency(n, currency);
   const [purchases, expenses, payments, refunds, orders, orderCosts, products, suppliers, settings] = await Promise.all([
     supabase.from('purchases').select('id,reference,invoice_path,total_cost,amount_paid,supplier:suppliers(name),items:purchase_items(id)'),
-    supabase.from('expenses').select('id,description,category,paid_by,invoice_path,amount'),
-    supabase.from('purchase_payments').select('id,paid_by'),
+    supabase.from('expenses').select('id,description,category,paid_by,invoice_path,reference,amount'),
+    supabase.from('purchase_payments').select('id,paid_by,reference'),
     supabase.from('order_refunds').select('id,refunded_by'),
     supabase.from('orders').select('id,order_number,status,payment_status'),
     supabase.from('order_costs').select('order_id,delivery_cost,received_by'),
@@ -59,6 +59,9 @@ export async function loadAttention(currency = 'LKR'): Promise<AttentionItem[]> 
   push({ key: 'expense-no-payer', level: 'high', count: exp.filter(e => blank(e.paid_by)).length, title: 'Expenses with no "Paid by"', detail: 'Nobody is credited for these on the Partners tab.', to: '/admin/finance?tab=expenses', action: 'Open Expenses' });
   push({ key: 'payment-no-payer', level: 'high', count: (payments.data || []).filter((p: any) => blank(p.paid_by)).length, title: 'Supplier payments with no partner chosen', detail: 'Open the shipment payment history and re-enter them with the partner who paid.', to: '/admin/finance?tab=suppliers', action: 'Open Suppliers' });
   push({ key: 'refund-no-payer', level: 'high', count: (refunds.data || []).filter((r: any) => blank(r.refunded_by)).length, title: 'Refunds with no partner chosen', detail: 'Open the order and re-enter the refund.', to: '/admin/orders', action: 'Open Orders' });
+  const expNoRef = exp.filter(e => blank(e.reference));
+  push({ key: 'expense-no-invoice-no', level: 'medium', count: expNoRef.length, title: 'Expenses with no receipt / invoice number', detail: names(expNoRef.map(e => e.description || e.category)), to: '/admin/finance?tab=expenses', action: 'Add numbers' });
+  push({ key: 'payment-no-invoice-no', level: 'medium', count: (payments.data || []).filter((p: any) => blank(p.reference)).length, title: 'Supplier payments with no invoice / slip number', detail: 'Open the shipment, edit its invoice number to fill them in, or add the number when you record the payment.', to: '/admin/finance?tab=suppliers', action: 'Open Suppliers' });
   push({ key: 'expense-no-file', level: 'low', count: exp.filter(e => blank(e.invoice_path)).length, title: 'Expenses with no receipt attached', detail: names(exp.filter(e => blank(e.invoice_path)).map(e => e.description || e.category)), to: '/admin/finance?tab=expenses', action: 'Attach receipts' });
 
   // ---- orders ----------------------------------------------------------------------------------
@@ -88,7 +91,7 @@ export async function loadAttention(currency = 'LKR'): Promise<AttentionItem[]> 
   const noImg = published.filter(p => !(p.images || []).length);
   push({ key: 'product-no-image', level: 'medium', count: noImg.length, title: 'Published products with no photo', detail: names(noImg.map(p => p.name)), to: '/admin/products', action: 'Open Products' });
   const noInv = prods.filter(p => blank(p.c?.invoice_no));
-  push({ key: 'product-no-invoice', level: 'low', count: noInv.length, title: 'Products with no supplier invoice number', detail: 'Edit a product (or use the bulk-upload invoice_no column) to add it.', to: '/admin/products', action: 'Open Products' });
+  push({ key: 'product-no-invoice', level: 'medium', count: noInv.length, title: 'Products with no supplier invoice number', detail: `${names(noInv.map(p => p.name))} — edit a product, or use the invoice_no column in the bulk upload.`, to: '/admin/products', action: 'Open Products' });
 
   // ---- suppliers -------------------------------------------------------------------------------
   const noContact = (suppliers.data || []).filter((s: any) => blank(s.contact_person) && blank(s.phone) && blank(s.email));

@@ -43,6 +43,7 @@ export type ImportOptions = {
   defaultStatus: 'draft' | 'published';
   existing: 'skip' | 'update' | 'update_add_stock';
   createMissing: boolean;      // create unknown categories / suppliers
+  invoiceNo: string;           // supplier invoice / order no. applied to every row that has none of its own
 };
 
 export type ParsedRow = {
@@ -140,7 +141,7 @@ export function parseRows(grid: unknown[][], opt: ImportOptions): { rows: Parsed
       description: nameRaw ? desc : '',
       category: text(o.category),
       supplier: text(o.supplier),
-      invoice_no: text(o.invoice_no),
+      invoice_no: text(o.invoice_no) || (opt.invoiceNo || '').trim(),
       supplier_cost: supplier_cost || 0,
       landed_cost: Math.round(landed * 100) / 100,
       selling_price: selling ?? 0,
