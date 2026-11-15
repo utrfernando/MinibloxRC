@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Search, Eye, CheckCircle2, Printer, MessageCircle } from 'lucide-react';
-import { printOrderInvoice, whatsappLink } from '../../lib/finance';
+import { printOrderInvoice, whatsappLink, PARTNERS, type Refund } from '../../lib/finance';
 import { supabase, openReceipt, formatCurrency, formatDate, ORDER_STATUS_LABELS, ORDER_STATUS_STYLES, type Order, type OrderStatus } from '../../lib/supabase';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -134,21 +134,52 @@ const OrderModal: React.FC<{ order: Order | null; onClose: () => void; onStatus:
   const [delivery, setDelivery] = useState('');
   const [fee, setFee] = useState('');
   const [costsReady, setCostsReady] = useState(true);
+  const [receivedBy, setReceivedBy] = useState('');
+  const [receivedAt, setReceivedAt] = useState<string | null>(null);
+  const [refunds, setRefunds] = useState<Refund[]>([]);
+  const [rf, setRf] = useState({ amount: '', by: '', reason: '' });
+  const { user } = useAuth();
 
   useEffect(() => { setTracking(order?.tracking_number || ''); }, [order]);
   useEffect(() => {
-    setDelivery(''); setFee('');
+    setDelivery(''); setFee(''); setReceivedBy(''); setReceivedAt(null); setRefunds([]); setRf({ amount: '', by: '', reason: '' });
     if (!order) return;
     supabase.from('order_costs').select('*').eq('order_id', order.id).maybeSingle().then(({ data, error: e }) => {
       setCostsReady(!e);
-      if (data) { setDelivery(String(data.delivery_cost ?? '')); setFee(String(data.payment_fee ?? '')); }
+      if (data) { setDelivery(String(data.delivery_cost ?? '')); setFee(String(data.payment_fee ?? '')); setReceivedBy(data.received_by || ''); setReceivedAt(data.received_at || null); }
     });
+    loadRefunds(order.id);
   }, [order?.id]);
+
+  const loadRefunds = async (id: string) => {
+    const { data } = await supabase.from('order_refunds').select('*').eq('order_id', id).order('refund_date', { ascending: false });
+    setRefunds((data || []) as Refund[]);
+  };
+
+  const addRefund = async () => {
+    if (!order) return;
+    const amount = Number(rf.amount);
+    if (!(amount > 0)) return error('Enter the refund amount.');
+    if (!rf.by) return error('Choose which partner handed the money back.');
+    const { error: e } = await supabase.from('order_refunds').insert({ order_id: order.id, amount, refunded_by: rf.by, reason: rf.reason || null, created_by: user?.id });
+    if (e) return error(/order_refunds/.test(e.message) ? 'Run migration 0013 in Supabase first (refunds table is missing).' : e.message);
+    success('Refund recorded'); setRf({ amount: '', by: '', reason: '' }); loadRefunds(order.id);
+  };
+  const removeRefund = async (r: Refund) => {
+    if (!confirm('Delete this refund entry?')) return;
+    const { error: e } = await supabase.from('order_refunds').delete().eq('id', r.id);
+    if (e) error(e.message); else if (order) loadRefunds(order.id);
+  };
 
   const saveCosts = async () => {
     if (!order) return;
-    const { error: e } = await supabase.from('order_costs').upsert({ order_id: order.id, delivery_cost: Number(delivery) || 0, payment_fee: Number(fee) || 0, updated_at: new Date().toISOString() }, { onConflict: 'order_id' });
-    if (e) error(e.message); else success('Order costs saved');
+    const at = receivedBy ? (receivedAt || new Date().toISOString().slice(0, 10)) : null;
+    const { error: e } = await supabase.from('order_costs').upsert({
+      order_id: order.id, delivery_cost: Number(delivery) || 0, payment_fee: Number(fee) || 0,
+      received_by: receivedBy || null, received_at: at, updated_at: new Date().toISOString(),
+    }, { onConflict: 'order_id' });
+    if (e) error(/received_/.test(e.message) ? 'Run migration 0013 in Supabase first.' : e.message);
+    else { setReceivedAt(at); success('Saved'); }
   };
 
   if (!order) return null;
@@ -217,7 +248,7 @@ const OrderModal: React.FC<{ order: Order | null; onClose: () => void; onStatus:
           </div>
 
           <div className="rounded-3xl bg-cream-100 p-4">
-            <p className="text-xs font-extrabold uppercase text-ink-400 mb-1">Our costs for this order</p>
+            <p className="text-xs font-extrabold uppercase text-ink-400 mb-1">Our costs & money for this order</p>
             <p className="text-[11px] text-ink-400 mb-2">Used for profit reports. Don't also add the same cost under Finance &gt; Expenses.</p>
             {costsReady ? (
               <>
@@ -225,9 +256,33 @@ const OrderModal: React.FC<{ order: Order | null; onClose: () => void; onStatus:
                   <div><label className="text-[11px] font-bold text-ink-500">Delivery cost</label><Input type="number" min="0" step="0.01" value={delivery} onChange={e => setDelivery(e.target.value)} className="!py-2 text-sm" /></div>
                   <div><label className="text-[11px] font-bold text-ink-500">Payment fee</label><Input type="number" min="0" step="0.01" value={fee} onChange={e => setFee(e.target.value)} className="!py-2 text-sm" /></div>
                 </div>
-                <Button size="sm" variant="secondary" className="mt-2 w-full" onClick={saveCosts}>Save costs</Button>
+                <div className="mt-2">
+                  <label className="text-[11px] font-bold text-ink-500">Money received by (who got the customer's payment)</label>
+                  <Select value={receivedBy} onChange={e => setReceivedBy(e.target.value)} className="!py-2 text-sm">
+                    <option value="">Not received / not set</option>{PARTNERS.map(p => <option key={p}>{p}</option>)}
+                  </Select>
+                </div>
+                <Button size="sm" variant="secondary" className="mt-2 w-full" onClick={saveCosts}>Save</Button>
               </>
-            ) : <p className="text-xs text-red-500 font-semibold">Run migration 0009 in Supabase to track order costs.</p>}
+            ) : <p className="text-xs text-red-500 font-semibold">Run migration 0013 in Supabase to track order costs and who received the money.</p>}
+          </div>
+
+          <div className="rounded-3xl bg-cream-100 p-4">
+            <p className="text-xs font-extrabold uppercase text-ink-400 mb-1">Refunds</p>
+            {refunds.length === 0 && <p className="text-[11px] text-ink-400 mb-2">None. Record money handed back to the customer here.</p>}
+            {refunds.map(r => (
+              <div key={r.id} className="flex items-center justify-between gap-2 text-xs py-1">
+                <span className="text-ink-700"><b>{formatCurrency(Number(r.amount), currency)}</b> by {r.refunded_by || '—'}{r.reason ? ` · ${r.reason}` : ''}</span>
+                <button onClick={() => removeRefund(r)} className="text-red-500 font-bold hover:underline">Delete</button>
+              </div>
+            ))}
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <Input type="number" min="0" step="0.01" placeholder="Amount" value={rf.amount} onChange={e => setRf({ ...rf, amount: e.target.value })} className="!py-2 text-sm" />
+              <Select value={rf.by} onChange={e => setRf({ ...rf, by: e.target.value })} className="!py-2 text-sm"><option value="">Paid by…</option>{PARTNERS.map(p => <option key={p}>{p}</option>)}</Select>
+            </div>
+            <Input placeholder="Reason (optional)" value={rf.reason} onChange={e => setRf({ ...rf, reason: e.target.value })} className="!py-2 text-sm mt-2" />
+            <Button size="sm" variant="secondary" className="mt-2 w-full" onClick={addRefund}>Add refund</Button>
+            <p className="text-[11px] text-ink-400 mt-2">If you also mark the order Cancelled/Returned, it is already removed from sales — the refund then only moves cash, not profit.</p>
           </div>
 
           <div className="grid grid-cols-2 gap-2">

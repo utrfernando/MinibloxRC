@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { Plus, Trash2, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
+import { Plus, Trash2, ArrowDownToLine, ArrowUpFromLine, AlertTriangle } from 'lucide-react';
 import { supabase, formatDate } from '../../../lib/supabase';
-import { PARTNERS, type Expense, type PartnerTx } from '../../../lib/finance';
+import { PARTNERS, type Expense, type PartnerTx, type PurchasePayment, type Refund } from '../../../lib/finance';
 import { useToast } from '../../../contexts/ToastContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Table, Td } from '../ui';
@@ -11,8 +11,20 @@ import { Input, Select, Field } from '../../ui/Input';
 
 const blank = { tx_date: new Date().toISOString().slice(0, 10), partner: '', kind: 'contribution', amount: '', note: '' };
 
-/** Money each partner put in / took out, plus expenses they paid personally. */
-export const PartnersPanel: React.FC<{ txs: PartnerTx[]; expenses: Expense[]; money: (n: number) => string; reload: () => void }> = ({ txs, expenses, money, reload }) => {
+type Props = {
+  txs: PartnerTx[]; expenses: Expense[]; supplierPayments: PurchasePayment[]; refunds: Refund[];
+  salesHeld: { byPartner: Record<string, number>; unassignedCount: number; unassignedAmount: number };
+  money: (n: number) => string; reload: () => void;
+};
+
+/**
+ * Each partner's money position. All figures are all-time.
+ *   put in   = cash contributions + business expenses they paid + supplier payments they made + refunds they paid
+ *   held     = customer money they received on the business's behalf (set on each order)
+ *   taken out= withdrawals
+ *   balance  = put in − taken out − held   (positive: the business owes them · negative: they hold business money)
+ */
+export const PartnersPanel: React.FC<Props> = ({ txs, expenses, supplierPayments, refunds, salesHeld, money, reload }) => {
   const { success, error } = useToast();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
@@ -23,9 +35,15 @@ export const PartnersPanel: React.FC<{ txs: PartnerTx[]; expenses: Expense[]; mo
     const contributed = txs.filter(t => t.partner === p && t.kind === 'contribution').reduce((s, t) => s + Number(t.amount), 0);
     const withdrawn = txs.filter(t => t.partner === p && t.kind === 'withdrawal').reduce((s, t) => s + Number(t.amount), 0);
     const spent = expenses.filter(e => e.paid_by === p).reduce((s, e) => s + Number(e.amount), 0);
-    return { p, contributed, withdrawn, spent, net: contributed + spent - withdrawn };
-  }), [txs, expenses]);
-  const totalNet = stats.reduce((s, x) => s + x.net, 0);
+    const suppliers = supplierPayments.filter(x => x.paid_by === p).reduce((s, x) => s + Number(x.amount), 0);
+    const refunded = refunds.filter(r => r.refunded_by === p).reduce((s, r) => s + Number(r.amount), 0);
+    const held = salesHeld.byPartner[p] || 0;
+    const putIn = contributed + spent + suppliers + refunded;
+    return { p, contributed, withdrawn, spent, suppliers, refunded, held, putIn, net: putIn - withdrawn, balance: putIn - withdrawn - held };
+  }), [txs, expenses, supplierPayments, refunds, salesHeld]);
+  const totalNet = stats.reduce((s, x) => s + Math.max(0, x.net), 0);
+
+  const missingPayer = expenses.filter(e => !e.paid_by).length + supplierPayments.filter(x => !x.paid_by).length + refunds.filter(r => !r.refunded_by).length;
 
   const save = async () => {
     const amount = Number(form.amount);
@@ -43,25 +61,48 @@ export const PartnersPanel: React.FC<{ txs: PartnerTx[]; expenses: Expense[]; mo
     if (e) error(e.message); else reload();
   };
 
+  const row = (label: string, value: string, tone = 'text-ink-900') => (
+    <div className="flex justify-between"><dt className="text-ink-500">{label}</dt><dd className={`font-bold ${tone}`}>{value}</dd></div>
+  );
+
   return (
     <div className="space-y-6">
+      {(missingPayer > 0 || salesHeld.unassignedCount > 0) && (
+        <div className="rounded-3xl bg-sunshine-50 border border-sunshine-200 p-4 text-sm text-ink-800 flex gap-3">
+          <AlertTriangle className="shrink-0 text-sunshine-600" size={18} />
+          <div className="space-y-1">
+            {missingPayer > 0 && <p><b>{missingPayer}</b> expense/payment/refund entr{missingPayer === 1 ? 'y has' : 'ies have'} no partner chosen, so nobody is credited for {missingPayer === 1 ? 'it' : 'them'}.</p>}
+            {salesHeld.unassignedCount > 0 && <p><b>{salesHeld.unassignedCount}</b> paid order(s) worth <b>{money(salesHeld.unassignedAmount)}</b> have no "money received by" set — open the order and choose who received the money.</p>}
+          </div>
+        </div>
+      )}
+
       <div className="grid sm:grid-cols-2 gap-4">
         {stats.map(s => (
           <div key={s.p} className="rounded-4xl border border-ink-100 bg-white p-5 shadow-soft">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-display text-xl font-extrabold text-ink-900">{s.p}</h3>
-              <span className="rounded-full bg-lavender-50 text-lavender-600 px-3 py-1 text-xs font-extrabold">{totalNet > 0 ? Math.round((s.net / totalNet) * 100) : 0}% of total put in</span>
+              <span className="rounded-full bg-lavender-50 text-lavender-600 px-3 py-1 text-xs font-extrabold">{totalNet > 0 ? Math.round((Math.max(0, s.net) / totalNet) * 100) : 0}% of money invested</span>
             </div>
             <dl className="space-y-1.5 text-sm">
-              <div className="flex justify-between"><dt className="text-ink-500">Cash put in (contributions)</dt><dd className="font-bold text-ink-900">{money(s.contributed)}</dd></div>
-              <div className="flex justify-between"><dt className="text-ink-500">Business expenses paid</dt><dd className="font-bold text-ink-900">{money(s.spent)}</dd></div>
-              <div className="flex justify-between"><dt className="text-ink-500">Taken out (withdrawals)</dt><dd className="font-bold text-red-500">−{money(s.withdrawn)}</dd></div>
+              {row('Cash put in (contributions)', money(s.contributed))}
+              {row('Business expenses paid', money(s.spent))}
+              {row('Supplier payments made', money(s.suppliers))}
+              {row('Customer refunds paid', money(s.refunded))}
+              {row('Taken out (withdrawals)', `−${money(s.withdrawn)}`, 'text-red-500')}
               <div className="flex justify-between border-t border-ink-100 pt-2 mt-2"><dt className="font-extrabold text-ink-800">Net invested</dt><dd className="font-extrabold text-mint-700">{money(s.net)}</dd></div>
+              {row('Customer money they hold for the business', `−${money(s.held)}`, 'text-red-500')}
+              <div className="flex justify-between border-t border-ink-100 pt-2 mt-2">
+                <dt className="font-extrabold text-ink-800">{s.balance >= 0 ? 'Business owes them' : 'They hold business money'}</dt>
+                <dd className={`font-extrabold ${s.balance >= 0 ? 'text-mint-700' : 'text-sunshine-700'}`}>{money(Math.abs(s.balance))}</dd>
+              </div>
             </dl>
           </div>
         ))}
       </div>
-      <p className="text-xs text-ink-400 font-semibold -mt-3">Net invested = contributions + expenses paid from own pocket − withdrawals. Use this to settle up when you split profit.</p>
+      <p className="text-xs text-ink-400 font-semibold -mt-3">
+        Net invested = money they put in − what they took out. "Customer money held" comes from the <i>Money received by</i> field on each paid order. When you pay a partner back or share profit, record it below as a withdrawal; the balance then goes down.
+      </p>
 
       <div className="flex items-center justify-between">
         <h3 className="font-display text-xl font-extrabold text-ink-900">Contributions & withdrawals</h3>
@@ -87,9 +128,10 @@ export const PartnersPanel: React.FC<{ txs: PartnerTx[]; expenses: Expense[]; mo
           <Field label="Date"><Input type="date" value={form.tx_date} onChange={e => setForm({ ...form, tx_date: e.target.value })} /></Field>
           <Field label="Amount"><Input type="number" min="0" step="0.01" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} /></Field>
           <Field label="Partner"><Select value={form.partner} onChange={e => setForm({ ...form, partner: e.target.value })}><option value="">Select…</option>{PARTNERS.map(p => <option key={p}>{p}</option>)}</Select></Field>
-          <Field label="Type"><Select value={form.kind} onChange={e => setForm({ ...form, kind: e.target.value })}><option value="contribution">Put money in (contribution)</option><option value="withdrawal">Took money out (withdrawal / profit share)</option></Select></Field>
-          <div className="sm:col-span-2"><Field label="Note"><Input value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} placeholder="e.g. First stock order, profit share for March" /></Field></div>
+          <Field label="Type"><Select value={form.kind} onChange={e => setForm({ ...form, kind: e.target.value })}><option value="contribution">Put money in (contribution)</option><option value="withdrawal">Took money out / paid back / profit share</option></Select></Field>
+          <div className="sm:col-span-2"><Field label="Note"><Input value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} placeholder="e.g. Paid Davide back for stock, profit share for March" /></Field></div>
         </div>
+        <p className="mt-3 text-xs font-semibold text-ink-500">Don't add a contribution for money a partner already paid straight to a supplier or for an expense — that is counted automatically.</p>
         <div className="flex justify-end gap-2 mt-5"><Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button><Button loading={saving} onClick={save}>Save</Button></div>
       </Modal>
     </div>

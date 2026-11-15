@@ -10,7 +10,7 @@ import { AdminHeader, StatCard, Table, Td } from '../../components/admin/ui';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Input, Select, Field } from '../../components/ui/Input';
-import { PARTNERS, EXPENSE_CATEGORIES, isStockExpense, type Expense, type PartnerTx, type OrderCost, type Budget, type Recurring, type Lock } from '../../lib/finance';
+import { PARTNERS, EXPENSE_CATEGORIES, STOCK_CATEGORY, IMPORT_CATEGORY, isStockExpense, lkDate, toYmd, lineCost, type Expense, type PartnerTx, type OrderCost, type Budget, type Recurring, type Lock, type PurchasePayment, type Refund, type ItemCost } from '../../lib/finance';
 import { PartnersPanel } from '../../components/admin/finance/PartnersPanel';
 import { BudgetsPanel } from '../../components/admin/finance/BudgetsPanel';
 import { RecurringPanel } from '../../components/admin/finance/RecurringPanel';
@@ -64,6 +64,9 @@ const AdminFinance: React.FC = () => {
   const [recurring, setRecurring] = useState<Recurring[]>([]);
   const [locks, setLocks] = useState<Lock[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [purchasePayments, setPurchasePayments] = useState<PurchasePayment[]>([]);
+  const [refunds, setRefunds] = useState<Refund[]>([]);
+  const [itemCosts, setItemCosts] = useState<ItemCost[]>([]);
   const [suiteMissing, setSuiteMissing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [missingTable, setMissingTable] = useState(false);
@@ -74,7 +77,7 @@ const AdminFinance: React.FC = () => {
   const [saving, setSaving] = useState(false);
 
   const load = async () => {
-    const [o, p, e, pu, pt, oc, bu, rc, lk, ca] = await Promise.all([
+    const [o, p, e, pu, pt, oc, bu, rc, lk, ca, pp, rf, ic] = await Promise.all([
       supabase.from('orders').select('*, items:order_items(*)').order('placed_at', { ascending: false }),
       supabase.from('products').select('id,name,stock_quantity,category_id,' + PRODUCT_COSTS_EMBED),
       supabase.from('expenses').select('*').order('expense_date', { ascending: false }),
@@ -85,7 +88,13 @@ const AdminFinance: React.FC = () => {
       supabase.from('recurring_expenses').select('*').order('created_at'),
       supabase.from('finance_locks').select('*').order('month', { ascending: false }),
       supabase.from('categories').select('id,name'),
+      supabase.from('purchase_payments').select('*').order('pay_date', { ascending: false }),
+      supabase.from('order_refunds').select('*').order('refund_date', { ascending: false }),
+      supabase.from('order_item_costs').select('*'),
     ]);
+    setPurchasePayments((pp.data || []) as PurchasePayment[]);
+    setRefunds((rf.data || []) as Refund[]);
+    setItemCosts((ic.data || []) as ItemCost[]);
     setSuiteMissing(!!pt.error);
     setTxs((pt.data || []) as PartnerTx[]);
     setOrderCosts((oc.data || []) as OrderCost[]);
@@ -103,7 +112,9 @@ const AdminFinance: React.FC = () => {
   useEffect(() => { load(); }, []);
 
   const start = rangeStart(range);
-  const inRange = (d: string) => !start || new Date(d) >= start;
+  // Dates are compared as Sri Lanka calendar days (not UTC), so an order at 1am on the 1st lands in the right month.
+  const startYmd = start ? toYmd(start) : null;
+  const inRange = (d: string) => !startYmd || lkDate(d) >= startYmd;
 
   const f = useMemo(() => {
     const productMap = new Map(products.map(p => [p.id, p]));
@@ -111,12 +122,18 @@ const AdminFinance: React.FC = () => {
     const revenue = valid.reduce((s, o) => s + Number(o.total_amount), 0);
     const collected = valid.filter(o => o.payment_status === 'paid').reduce((s, o) => s + Number(o.total_amount), 0);
     const outstanding = valid.filter(o => o.payment_status === 'pending').reduce((s, o) => s + Number(o.total_amount), 0);
-    const cogs = valid.reduce((s, o) => s + (o.items || []).reduce((a, i) => {
-      const p = i.product_id ? productMap.get(i.product_id) : undefined;
-      return a + Number(p?.landed_cost || p?.supplier_cost || 0) * i.quantity;
-    }, 0), 0);
+    // Cost of items sold = the cost saved when each item was sold (falls back to today's cost for older orders)
+    const snap = new Map(itemCosts.map(c => [c.order_item_id, Number(c.unit_cost)]));
+    const cogs = valid.reduce((s, o) => s + (o.items || []).reduce((a, i) => a + lineCost(i, snap, productMap), 0), 0);
+    // Refunds: money handed back. Reduces profit only if the order is still counted as a sale
+    // (a cancelled/returned order is already removed from revenue).
+    const orderById = new Map(orders.map(o => [o.id, o]));
+    const refundsIn = refunds.filter(r => inRange(r.refund_date));
+    const refundTotal = refundsIn.reduce((s, r) => s + Number(r.amount), 0);
+    const refundProfit = refundsIn.filter(r => { const o = orderById.get(r.order_id); return !!o && o.status !== 'cancelled' && o.status !== 'returned'; }).reduce((s, r) => s + Number(r.amount), 0);
+    const revenueNet = revenue - refundProfit;
     const exp = expenses.filter(e => inRange(e.expense_date));
-    // Running costs reduce profit. Stock purchases are tracked separately: their cost reaches profit through
+    // Running costs reduce profit. Goods bought for resale are tracked separately: their cost reaches profit through
     // the cost price of items when they are sold, so counting them here too would double-count.
     const expenseTotal = exp.filter(e => !isStockExpense(e)).reduce((s, e) => s + Number(e.amount), 0);
     const stockExpenseTotal = exp.filter(isStockExpense).reduce((s, e) => s + Number(e.amount), 0);
@@ -125,27 +142,43 @@ const AdminFinance: React.FC = () => {
     const costMap = new Map(orderCosts.map(c => [c.order_id, c]));
     const orderCostTotal = valid.reduce((s, o) => s + Number(costMap.get(o.id)?.delivery_cost || 0) + Number(costMap.get(o.id)?.payment_fee || 0), 0);
     const owedSuppliers = purchases.reduce((s, p) => s + owedOn(p), 0);
-    const gross = revenue - cogs;
+    const gross = revenueNet - cogs;
     const net = gross - orderCostTotal - expenseTotal;
     const inventoryValue = products.reduce((s, p) => s + Number(p.landed_cost || p.supplier_cost || 0) * p.stock_quantity, 0);
-    const margin = revenue > 0 ? (net / revenue) * 100 : 0;
-    return { valid, revenue, collected, outstanding, cogs, exp, expenseTotal, stockExpenseTotal, paidTotal, purchaseSpend, gross, net, inventoryValue, margin, orderCostTotal, owedSuppliers };
-  }, [orders, products, expenses, purchases, orderCosts, range]);
+    const margin = revenueNet > 0 ? (net / revenueNet) * 100 : 0;
+    return { valid, revenue, revenueNet, refundTotal, refundProfit, collected, outstanding, cogs, exp, expenseTotal, stockExpenseTotal, paidTotal, purchaseSpend, gross, net, inventoryValue, margin, orderCostTotal, owedSuppliers };
+  }, [orders, products, expenses, purchases, orderCosts, refunds, itemCosts, range]);
+
+  // Money customers paid that a partner is holding for the business (all time - balances are cumulative)
+  const salesHeld = useMemo(() => {
+    const byPartner: Record<string, number> = {};
+    const rc = new Map(orderCosts.map(c => [c.order_id, c.received_by]));
+    let unassignedCount = 0, unassignedAmount = 0;
+    orders.filter(o => o.payment_status === 'paid' && o.status !== 'cancelled' && o.status !== 'returned').forEach(o => {
+      const who = rc.get(o.id);
+      if (who) byPartner[who] = (byPartner[who] || 0) + Number(o.total_amount);
+      else { unassignedCount++; unassignedAmount += Number(o.total_amount); }
+    });
+    return { byPartner, unassignedCount, unassignedAmount };
+  }, [orders, orderCosts]);
 
   const monthly = useMemo(() => {
     const productMap = new Map(products.map(p => [p.id, p]));
+    const snap = new Map(itemCosts.map(c => [c.order_item_id, Number(c.unit_cost)]));
+    const orderById = new Map(orders.map(o => [o.id, o]));
     const m = new Map<string, { month: string; Revenue: number; Costs: number; Profit: number }>();
     const row = (d: string) => { const k = d.slice(0, 7); if (!m.has(k)) m.set(k, { month: k, Revenue: 0, Costs: 0, Profit: 0 }); return m.get(k)!; };
     orders.filter(o => inRange(o.placed_at) && o.status !== 'cancelled' && o.status !== 'returned').forEach(o => {
-      const r = row(o.placed_at);
+      const r = row(lkDate(o.placed_at));
       r.Revenue += Number(o.total_amount);
-      r.Costs += (o.items || []).reduce((a, i) => { const p = i.product_id ? productMap.get(i.product_id) : undefined; return a + Number(p?.landed_cost || p?.supplier_cost || 0) * i.quantity; }, 0);
+      r.Costs += (o.items || []).reduce((a, i) => a + lineCost(i, snap, productMap), 0);
       const oc = orderCosts.find(c => c.order_id === o.id);
       r.Costs += Number(oc?.delivery_cost || 0) + Number(oc?.payment_fee || 0);
     });
     expenses.filter(e => inRange(e.expense_date) && !isStockExpense(e)).forEach(e => { row(e.expense_date).Costs += Number(e.amount); });
+    refunds.filter(r => inRange(r.refund_date)).forEach(r => { const o = orderById.get(r.order_id); if (o && o.status !== 'cancelled' && o.status !== 'returned') row(r.refund_date).Revenue -= Number(r.amount); });
     return [...m.values()].sort((a, b) => a.month.localeCompare(b.month)).map(r => ({ ...r, Revenue: Math.round(r.Revenue), Costs: Math.round(r.Costs), Profit: Math.round(r.Revenue - r.Costs) }));
-  }, [orders, products, expenses, orderCosts, range]);
+  }, [orders, products, expenses, orderCosts, refunds, itemCosts, range]);
 
   const byCategory = useMemo(() => {
     const m = new Map<string, number>();
@@ -241,13 +274,13 @@ const AdminFinance: React.FC = () => {
       {loading ? <p className="text-ink-400">Loading…</p> : <>
         {tab === 'overview' && <>
         <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-          <StatCard label="Revenue" value={money(f.revenue)} icon={<Banknote size={20} />} tone="mint" hint={`${f.valid.length} orders`} />
+          <StatCard label="Revenue" value={money(f.revenueNet)} icon={<Banknote size={20} />} tone="mint" hint={f.refundProfit > 0 ? `${f.valid.length} orders, after ${money(f.refundProfit)} refunds` : `${f.valid.length} orders`} />
           <StatCard label="Gross profit" value={money(f.gross)} icon={<TrendingUp size={20} />} tone="lavender" hint={`Cost of goods ${money(f.cogs)}`} />
-          <StatCard label="Running expenses" value={money(f.expenseTotal)} icon={<Receipt size={20} />} tone="peach" hint="Reduce profit (excludes stock purchases)" />
+          <StatCard label="Running expenses" value={money(f.expenseTotal)} icon={<Receipt size={20} />} tone="peach" hint="Reduce profit (excludes goods for resale)" />
           <StatCard label="Net profit" value={money(f.net)} icon={<Wallet size={20} />} tone={f.net >= 0 ? 'mint' : 'red'} hint={`${f.margin.toFixed(1)}% margin`} />
           <StatCard label="Cash collected" value={money(f.collected)} icon={<Banknote size={20} />} tone="mint" hint="Orders marked paid" />
           <StatCard label="Outstanding" value={money(f.outstanding)} icon={<AlertTriangle size={20} />} tone="sunshine" hint="Unpaid / COD pending" />
-          <StatCard label="Stock purchases" value={money(f.purchaseSpend)} icon={<Truck size={20} />} tone="ink" hint={f.stockExpenseTotal > 0 ? `Includes ${money(f.stockExpenseTotal)} entered as expenses` : 'Goods bought for resale'} />
+          <StatCard label="Goods for resale" value={money(f.purchaseSpend)} icon={<Truck size={20} />} tone="ink" hint={f.stockExpenseTotal > 0 ? `Includes ${money(f.stockExpenseTotal)} entered as expenses` : 'Goods bought for resale'} />
           <StatCard label="Inventory value" value={money(f.inventoryValue)} icon={<Boxes size={20} />} tone="lavender" hint="Stock on hand at cost" />
           <StatCard label="Delivery & fees" value={money(f.orderCostTotal)} icon={<Truck size={20} />} tone="peach" hint="Costs entered on orders" />
           <StatCard label="Owed to suppliers" value={money(f.owedSuppliers)} icon={<Wallet size={20} />} tone={f.owedSuppliers > 0 ? 'red' : 'mint'} hint="Unpaid purchases" />
@@ -312,10 +345,10 @@ const AdminFinance: React.FC = () => {
         )}
         </>}
 
-        {tab === 'partners' && <PartnersPanel txs={txs} expenses={expenses} money={money} reload={load} />}
-        {tab === 'suppliers' && <SupplierPanel purchases={purchases} money={money} reload={load} />}
-        {tab === 'profit' && <ProfitPanel orders={f.valid} products={products as any} categories={categories} orderCosts={orderCosts} money={money} />}
-        {tab === 'records' && <RecordsPanel locks={locks} orders={orders} products={products} expenses={expenses} txs={txs} purchases={purchases} orderCosts={orderCosts} reload={load} />}
+        {tab === 'partners' && <PartnersPanel txs={txs} expenses={expenses} supplierPayments={purchasePayments} refunds={refunds} salesHeld={salesHeld} money={money} reload={load} />}
+        {tab === 'suppliers' && <SupplierPanel purchases={purchases} payments={purchasePayments} money={money} reload={load} />}
+        {tab === 'profit' && <ProfitPanel orders={f.valid} products={products as any} categories={categories} orderCosts={orderCosts} itemCosts={itemCosts} refunds={refunds} money={money} />}
+        {tab === 'records' && <RecordsPanel locks={locks} orders={orders} products={products} expenses={expenses} txs={txs} purchases={purchases} orderCosts={orderCosts} itemCosts={itemCosts} refunds={refunds} purchasePayments={purchasePayments} reload={load} />}
       </>}
 
       <Modal open={formOpen} onClose={() => setFormOpen(false)} title={editId ? "Edit expense" : "Add expense"}>
@@ -323,6 +356,13 @@ const AdminFinance: React.FC = () => {
           <Field label="Date"><Input type="date" value={form.expense_date} onChange={e => setForm({ ...form, expense_date: e.target.value })} /></Field>
           <Field label="Amount"><Input type="number" min="0" step="0.01" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} /></Field>
           <Field label="Category"><Select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>{EXPENSE_CATEGORIES.map(c => <option key={c}>{c}</option>)}</Select></Field>
+          {(form.category === STOCK_CATEGORY || form.category === IMPORT_CATEGORY) && (
+            <p className="sm:col-span-2 rounded-2xl bg-sunshine-50 border border-sunshine-200 px-3 py-2 text-xs font-semibold text-sunshine-700">
+              {form.category === STOCK_CATEGORY
+                ? 'For goods you buy to resell that are NOT tracked in Inventory. If this stock is in Inventory, record it under Inventory → Purchases instead — never both for the same money.'
+                : 'Freight / customs on a shipment. Easier: enter it inside Inventory → Purchases, where it is spread into each product\'s cost price automatically.'}
+            </p>
+          )}
           <Field label="Payment method"><Select value={form.payment_method} onChange={e => setForm({ ...form, payment_method: e.target.value })}><option value="cash">Cash</option><option value="bank">Bank transfer</option><option value="card">Card</option><option value="other">Other</option></Select></Field>
           <Field label="Paid by (who spent it)"><Select value={form.paid_by} onChange={e => setForm({ ...form, paid_by: e.target.value })}><option value="">Select person…</option>{PARTNERS.map(p => <option key={p} value={p}>{p}</option>)}</Select></Field>
           <Field label="Paid to"><Input value={form.paid_to} onChange={e => setForm({ ...form, paid_to: e.target.value })} /></Field>

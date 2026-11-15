@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, ArrowUpFromLine, Package, Truck } from 'lucide-react';
 import { InvoiceControl } from '../../components/admin/InvoiceControl';
+import { PARTNERS, IMPORT_CATEGORY } from '../../lib/finance';
 import { PaymentBadge, PaymentModal, owedOn, type PurchasePay } from '../../components/admin/finance/SupplierPanel';
 import { supabase, PRODUCT_COSTS_EMBED, withCosts, formatCurrency, formatDate, type Product, type InventoryTransaction, type Purchase, type Supplier } from '../../lib/supabase';
 import { useSettings } from '../../contexts/SettingsContext';
@@ -243,31 +244,67 @@ const PurchaseModal: React.FC<{ open: boolean; onClose: () => void; products: Pr
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
   const [paidNow, setPaidNow] = useState('');
+  const [paidBy, setPaidBy] = useState('');
+  const [payMethod, setPayMethod] = useState('bank');
+  const [importCost, setImportCost] = useState('');
+  const [importPaidBy, setImportPaidBy] = useState('');
   const [rows, setRows] = useState<{ product_id: string; quantity: number; unit_cost: number }[]>([{ product_id: '', quantity: 1, unit_cost: 0 }]);
   const [saving, setSaving] = useState(false);
 
   const total = rows.reduce((s, r) => s + r.quantity * r.unit_cost, 0);
 
+  const extra = Math.max(0, Number(importCost) || 0);
+
   const save = async () => {
     const valid = rows.filter(r => r.product_id && r.quantity > 0);
     if (!valid.length) { error('Add at least one item'); return; }
+    const paid = Math.min(Math.max(0, Number(paidNow) || 0), total);
+    if (paid > 0 && !paidBy) { error('Choose which partner paid the supplier.'); return; }
+    if (extra > 0 && !importPaidBy) { error('Choose which partner paid the freight / customs.'); return; }
     setSaving(true);
     const { data: purchase, error: e } = await supabase.from('purchases').insert({
       supplier_id: supplierId || null, reference: reference || null, purchase_date: date,
       total_cost: total, notes: notes || null, created_by: userId,
-      ...(Number(paidNow) > 0 ? { amount_paid: Math.min(Number(paidNow), total), last_paid_date: date } : {}),
+      ...(extra > 0 ? { extra_costs: extra } : {}),
     }).select('id').single();
     if (e) { error(e.message); setSaving(false); return; }
     await supabase.from('purchase_items').insert(valid.map(r => ({ purchase_id: purchase.id, product_id: r.product_id, quantity: r.quantity, unit_cost: r.unit_cost })));
+
+    // Supplier payment (who paid is kept, so the Partners tab credits them)
+    if (paid > 0) {
+      const { error: pe } = await supabase.from('purchase_payments').insert({ purchase_id: purchase.id, pay_date: date, amount: paid, paid_by: paidBy, method: payMethod, created_by: userId });
+      if (pe) error('Purchase saved, but the payment was not recorded: ' + pe.message);
+    }
+    // Freight / customs: money out (credited to the partner) AND added into each product's landed cost.
+    if (extra > 0) {
+      const { error: xe } = await supabase.from('expenses').insert({
+        expense_date: date, category: IMPORT_CATEGORY, description: `Freight/customs for ${reference || 'purchase'}`, amount: extra,
+        paid_by: importPaidBy, payment_method: payMethod, reference: reference || null, created_by: userId,
+      });
+      if (xe) error('Purchase saved, but the freight expense was not recorded: ' + xe.message);
+    }
+
+    // Stock + landed cost. Landed cost = supplier cost + a fair share of freight/customs (by value),
+    // averaged with the stock already on the shelf.
+    const lineValue = (r: { quantity: number; unit_cost: number }) => r.quantity * r.unit_cost;
+    const goods = valid.reduce((sum, r) => sum + lineValue(r), 0);
+    const units = valid.reduce((sum, r) => sum + r.quantity, 0);
+    const live = new Map<string, { stock: number; landed: number; supplier: number }>();
     for (const r of valid) {
       const prod = products.find(p => p.id === r.product_id);
       if (!prod) continue;
-      await supabase.from('products').update({ stock_quantity: prod.stock_quantity + r.quantity }).eq('id', r.product_id);
+      const cur = live.get(r.product_id) || { stock: prod.stock_quantity, landed: Number(prod.landed_cost || prod.supplier_cost || 0), supplier: Number(prod.supplier_cost || 0) };
+      const share = extra > 0 ? (goods > 0 ? extra * (lineValue(r) / goods) : extra * (r.quantity / units)) : 0;
+      const unitLanded = r.unit_cost + share / r.quantity;
+      const newStock = cur.stock + r.quantity;
+      const newLanded = cur.stock > 0 && cur.landed > 0 ? (cur.stock * cur.landed + r.quantity * unitLanded) / newStock : unitLanded || cur.landed;
+      live.set(r.product_id, { stock: newStock, landed: Math.round(newLanded * 100) / 100, supplier: cur.supplier || r.unit_cost });
+      await supabase.from('products').update({ stock_quantity: newStock }).eq('id', r.product_id);
       await supabase.from('product_costs').upsert({
         product_id: r.product_id,
-        supplier_id: prod.supplier_id ?? null,
-        supplier_cost: prod.supplier_cost || 0,
-        landed_cost: r.unit_cost || prod.landed_cost || 0,
+        supplier_id: supplierId || prod.supplier_id || null,
+        supplier_cost: live.get(r.product_id)!.supplier,
+        landed_cost: live.get(r.product_id)!.landed,
       });
       await supabase.from('inventory_transactions').insert({ product_id: r.product_id, quantity_change: r.quantity, reason: 'purchase', reference_type: 'purchase', reference_id: purchase.id, notes: `Purchase ${reference || ''}`.trim(), created_by: userId });
     }
@@ -301,12 +338,19 @@ const PurchaseModal: React.FC<{ open: boolean; onClose: () => void; products: Pr
           ))}
           <Button variant="secondary" size="sm" onClick={() => setRows([...rows, { product_id: '', quantity: 1, unit_cost: 0 }])}><Plus size={14} /> Add Row</Button>
         </div></div>
-        <Field label="Amount paid to supplier now (leave empty if unpaid)" hint="Pay the rest later from Finance > Suppliers or the Pay button on the purchase.">
-          <Input type="number" min="0" step="0.01" value={paidNow} onChange={e => setPaidNow(e.target.value)} placeholder="0.00" />
-        </Field>
+        <div className="grid sm:grid-cols-3 gap-4 rounded-3xl bg-cream-100 p-4">
+          <Field label="Paid to supplier now" hint="Leave empty if unpaid"><Input type="number" min="0" step="0.01" value={paidNow} onChange={e => setPaidNow(e.target.value)} placeholder="0.00" /></Field>
+          <Field label="Paid by (own pocket)"><Select value={paidBy} onChange={e => setPaidBy(e.target.value)}><option value="">Select…</option>{PARTNERS.map(p => <option key={p}>{p}</option>)}</Select></Field>
+          <Field label="Method"><Select value={payMethod} onChange={e => setPayMethod(e.target.value)}><option value="bank">Bank transfer</option><option value="cash">Cash</option><option value="card">Card</option><option value="other">Other</option></Select></Field>
+        </div>
+        <div className="grid sm:grid-cols-3 gap-4 rounded-3xl bg-cream-100 p-4">
+          <Field label="Freight + customs for this shipment" hint="Spread into each product's cost price"><Input type="number" min="0" step="0.01" value={importCost} onChange={e => setImportCost(e.target.value)} placeholder="0.00" /></Field>
+          <Field label="Freight paid by"><Select value={importPaidBy} onChange={e => setImportPaidBy(e.target.value)}><option value="">Select…</option>{PARTNERS.map(p => <option key={p}>{p}</option>)}</Select></Field>
+          <p className="text-xs font-semibold text-ink-500 self-end pb-2">Saved as an "{IMPORT_CATEGORY}" expense for the partner, and added to landed cost — so it is not counted twice in profit.</p>
+        </div>
         <Field label="Notes"><Textarea value={notes} onChange={e => setNotes(e.target.value)} className="min-h-[60px]" /></Field>
         <div className="flex items-center justify-between">
-          <p className="font-extrabold text-ink-900">Total: {formatCurrency(total, 'LKR')}</p>
+          <p className="font-extrabold text-ink-900">Goods: {formatCurrency(total, 'LKR')}{extra > 0 && <span className="ml-2 text-xs font-bold text-ink-500">+ {formatCurrency(extra, 'LKR')} freight = {formatCurrency(total + extra, 'LKR')} landed</span>}</p>
           <div className="flex gap-2"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button onClick={save} loading={saving}>Save Purchase</Button></div>
         </div>
       </div>

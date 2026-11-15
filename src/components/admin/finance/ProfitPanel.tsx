@@ -1,28 +1,29 @@
 import React, { useMemo, useState } from 'react';
 import { formatDate, type Order, type Product } from '../../../lib/supabase';
-import { type OrderCost } from '../../../lib/finance';
+import { lineCost, type OrderCost, type ItemCost, type Refund } from '../../../lib/finance';
 import { Table, Td } from '../ui';
 
 type Cat = { id: string; name: string };
 
-const unitCost = (p?: Product) => Number(p?.landed_cost || p?.supplier_cost || 0);
-
 /** Profit by product, by category and per order (revenue − product cost − delivery − fees). */
 export const ProfitPanel: React.FC<{
-  orders: Order[]; products: (Product & { category_id?: string | null })[]; categories: Cat[]; orderCosts: OrderCost[]; money: (n: number) => string;
-}> = ({ orders, products, categories, orderCosts, money }) => {
+  orders: Order[]; products: (Product & { category_id?: string | null })[]; categories: Cat[]; orderCosts: OrderCost[]; itemCosts: ItemCost[]; refunds: Refund[]; money: (n: number) => string;
+}> = ({ orders, products, categories, orderCosts, itemCosts, refunds, money }) => {
   const [view, setView] = useState<'product' | 'category' | 'order'>('product');
 
   const data = useMemo(() => {
     const pm = new Map(products.map(p => [p.id, p]));
     const cm = new Map(categories.map(c => [c.id, c.name]));
     const oc = new Map(orderCosts.map(c => [c.order_id, c]));
+    const snap = new Map(itemCosts.map(c => [c.order_item_id, Number(c.unit_cost)]));
+    const refunded = new Map<string, number>();
+    refunds.forEach(r => refunded.set(r.order_id, (refunded.get(r.order_id) || 0) + Number(r.amount)));
     const byProduct = new Map<string, { name: string; cat: string; units: number; revenue: number; cost: number }>();
     const perOrder = orders.map(o => {
       let cogs = 0;
       (o.items || []).forEach(i => {
         const p = i.product_id ? pm.get(i.product_id) : undefined;
-        const cost = unitCost(p) * i.quantity;
+        const cost = lineCost(i, snap, pm); // cost saved at the time of sale
         cogs += cost;
         const key = i.product_id || i.product_name;
         const row = byProduct.get(key) || { name: i.product_name, cat: (p && p.category_id && cm.get(p.category_id)) || 'Uncategorised', units: 0, revenue: 0, cost: 0 };
@@ -31,14 +32,15 @@ export const ProfitPanel: React.FC<{
       });
       const c = oc.get(o.id);
       const extra = Number(c?.delivery_cost || 0) + Number(c?.payment_fee || 0);
-      return { o, cogs, extra, profit: Number(o.total_amount) - cogs - extra, hasCosts: !!c };
+      const back = refunded.get(o.id) || 0;
+      return { o, cogs, extra, profit: Number(o.total_amount) - back - cogs - extra, hasCosts: !!c };
     });
     const products_ = [...byProduct.values()].map(r => ({ ...r, profit: r.revenue - r.cost })).sort((a, b) => b.profit - a.profit);
     const cats = new Map<string, { units: number; revenue: number; cost: number }>();
     products_.forEach(r => { const c = cats.get(r.cat) || { units: 0, revenue: 0, cost: 0 }; c.units += r.units; c.revenue += r.revenue; c.cost += r.cost; cats.set(r.cat, c); });
     const categories_ = [...cats.entries()].map(([name, v]) => ({ name, ...v, profit: v.revenue - v.cost })).sort((a, b) => b.profit - a.profit);
     return { products_, categories_, perOrder };
-  }, [orders, products, categories, orderCosts]);
+  }, [orders, products, categories, orderCosts, itemCosts, refunds]);
 
   const pct = (profit: number, revenue: number) => (revenue > 0 ? `${((profit / revenue) * 100).toFixed(0)}%` : '—');
   const tab = (k: typeof view, l: string) => (
@@ -48,7 +50,7 @@ export const ProfitPanel: React.FC<{
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">{tab('product', 'By product')}{tab('category', 'By category')}{tab('order', 'Per order')}
-        <span className="text-xs text-ink-400 font-semibold ml-1">Product profit = sales − landed cost. Order profit also subtracts delivery cost and payment fees you enter on each order.</span>
+        <span className="text-xs text-ink-400 font-semibold ml-1">Product profit = sales − landed cost. Order profit also subtracts delivery cost, payment fees and any refund entered on the order. Item costs are the ones saved when each item was sold.</span>
       </div>
       {view === 'product' && (
         <Table head={['Product', 'Category', 'Units', 'Revenue', 'Cost', 'Profit', 'Margin']}>

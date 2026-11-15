@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Lock, Unlock, FileSpreadsheet, DatabaseBackup, History } from 'lucide-react';
 import { supabase, formatDate, type Order, type Product } from '../../../lib/supabase';
-import { PARTNERS, isStockExpense, downloadWorkbook, fetchAll, monthKey, type Expense, type Lock as LockRow, type OrderCost, type PartnerTx } from '../../../lib/finance';
+import { PARTNERS, isStockExpense, lkDate, lineCost, downloadWorkbook, fetchAll, monthKey, type Expense, type Lock as LockRow, type OrderCost, type PartnerTx, type ItemCost, type Refund, type PurchasePayment } from '../../../lib/finance';
 import { useToast } from '../../../contexts/ToastContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Button } from '../../ui/Button';
@@ -13,13 +13,14 @@ const lastMonths = (n: number) => Array.from({ length: n }, (_, i) => { const d 
 const BACKUP_TABLES = [
   'products', 'product_costs', 'product_images', 'categories', 'suppliers', 'purchases', 'purchase_items', 'inventory_transactions',
   'orders', 'order_items', 'order_costs', 'payments', 'expenses', 'partner_transactions', 'expense_budgets', 'recurring_expenses',
-  'finance_locks', 'discount_codes', 'profiles', 'website_settings', 'audit_logs',
+  'finance_locks', 'purchase_payments', 'order_refunds', 'order_item_costs', 'discount_codes', 'profiles', 'website_settings', 'audit_logs',
 ];
 
 const flat = (rows: any[]) => rows.map(r => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v !== null && typeof v === 'object' ? JSON.stringify(v).slice(0, 32000) : v])));
 
 type Props = {
   locks: LockRow[]; orders: Order[]; products: Product[]; expenses: Expense[]; txs: PartnerTx[]; purchases: PurchasePay[]; orderCosts: OrderCost[];
+  itemCosts: ItemCost[]; refunds: Refund[]; purchasePayments: PurchasePayment[];
   reload: () => void;
 };
 
@@ -28,7 +29,7 @@ const LABEL: Record<string, string> = { expenses: 'Expense', partner_transaction
 
 type Log = { id: string; user_id: string | null; action: string; entity: string; details: any; created_at: string };
 
-export const RecordsPanel: React.FC<Props> = ({ locks, orders, products, expenses, txs, purchases, orderCosts, reload }) => {
+export const RecordsPanel: React.FC<Props> = ({ locks, orders, products, expenses, txs, purchases, orderCosts, itemCosts, refunds, purchasePayments, reload }) => {
   const { success, error } = useToast();
   const { user } = useAuth();
   const [month, setMonth] = useState(monthKey());
@@ -62,25 +63,29 @@ export const RecordsPanel: React.FC<Props> = ({ locks, orders, products, expense
   };
 
   const monthReport = () => {
-    const inM = (d?: string | null) => !!d && d.startsWith(month);
+    const inM = (d?: string | null) => !!d && lkDate(d).startsWith(month); // Sri Lanka calendar month
     const pm = new Map(products.map(p => [p.id, p]));
     const oc = new Map(orderCosts.map(c => [c.order_id, c]));
+    const snap = new Map(itemCosts.map(c => [c.order_item_id, Number(c.unit_cost)]));
+    const refunded = new Map<string, number>();
+    refunds.filter(r => inM(r.refund_date)).forEach(r => refunded.set(r.order_id, (refunded.get(r.order_id) || 0) + Number(r.amount)));
     const sales = orders.filter(o => inM(o.placed_at) && o.status !== 'cancelled' && o.status !== 'returned');
     const exp = expenses.filter(e => inM(e.expense_date));
     const tx = txs.filter(t => inM(t.tx_date));
     let revenue = 0, cogs = 0, extra = 0;
     const orderRows = sales.map(o => {
-      const c = (o.items || []).reduce((a, i) => a + Number((i.product_id && pm.get(i.product_id)?.landed_cost) || (i.product_id && pm.get(i.product_id)?.supplier_cost) || 0) * i.quantity, 0);
+      const c = (o.items || []).reduce((a, i) => a + lineCost(i, snap, pm), 0);
       const x = Number(oc.get(o.id)?.delivery_cost || 0) + Number(oc.get(o.id)?.payment_fee || 0);
-      revenue += Number(o.total_amount); cogs += c; extra += x;
-      return { Order: o.order_number, Date: o.placed_at.slice(0, 10), Customer: o.customer_name, Status: o.status, Payment: o.payment_status, Total: Number(o.total_amount), 'Product cost': c, 'Delivery + fees': x, Profit: Number(o.total_amount) - c - x };
+      const back = refunded.get(o.id) || 0;
+      revenue += Number(o.total_amount) - back; cogs += c; extra += x;
+      return { Order: o.order_number, Date: lkDate(o.placed_at), Refunded: back, Customer: o.customer_name, Status: o.status, Payment: o.payment_status, Total: Number(o.total_amount), 'Product cost': c, 'Delivery + fees': x, Profit: Number(o.total_amount) - back - c - x };
     });
     const expTotal = exp.filter(e => !isStockExpense(e)).reduce((s, e) => s + Number(e.amount), 0); // running costs only
     const stockBought = exp.filter(isStockExpense).reduce((s, e) => s + Number(e.amount), 0);
     const summary: Record<string, unknown>[] = [
       { Item: 'Month', Value: month },
-      { Item: 'Revenue', Value: revenue }, { Item: 'Product cost (COGS)', Value: cogs }, { Item: 'Delivery + payment fees', Value: extra },
-      { Item: 'Gross profit', Value: revenue - cogs - extra }, { Item: 'Running expenses', Value: expTotal }, { Item: 'Stock purchases (not in profit)', Value: stockBought }, { Item: 'Net profit', Value: revenue - cogs - extra - expTotal },
+      { Item: 'Revenue (after refunds)', Value: revenue }, { Item: 'Product cost (COGS)', Value: cogs }, { Item: 'Delivery + payment fees', Value: extra },
+      { Item: 'Gross profit', Value: revenue - cogs - extra }, { Item: 'Running expenses', Value: expTotal }, { Item: 'Goods for resale (not in profit)', Value: stockBought }, { Item: 'Net profit', Value: revenue - cogs - extra - expTotal },
       { Item: 'Owed to suppliers (all time)', Value: purchases.reduce((s, p) => s + owedOn(p), 0) },
       ...PARTNERS.flatMap(p => [
         { Item: `${p} — expenses paid`, Value: exp.filter(e => e.paid_by === p).reduce((s, e) => s + Number(e.amount), 0) },
@@ -92,6 +97,8 @@ export const RecordsPanel: React.FC<Props> = ({ locks, orders, products, expense
       { name: 'Summary', rows: summary },
       { name: 'Sales', rows: orderRows },
       { name: 'Expenses', rows: exp.map(e => ({ Date: e.expense_date, Category: e.category, Description: e.description, Amount: e.amount, 'Paid by': e.paid_by, 'Paid to': e.paid_to, Method: e.payment_method, Reference: e.reference, Invoice: e.invoice_name })) },
+      { name: 'Supplier payments', rows: purchasePayments.filter(x => inM(x.pay_date)).map(x => ({ Date: x.pay_date, Amount: x.amount, 'Paid by': x.paid_by, Method: x.method, Reference: x.reference })) },
+      { name: 'Refunds', rows: refunds.filter(r => inM(r.refund_date)).map(r => ({ Date: r.refund_date, Order: orders.find(o => o.id === r.order_id)?.order_number, Amount: r.amount, 'Paid by': r.refunded_by, Reason: r.reason })) },
       { name: 'Partners', rows: tx.map(t => ({ Date: t.tx_date, Partner: t.partner, Type: t.kind, Amount: t.amount, Note: t.note })) },
       { name: 'Supplier purchases', rows: purchases.filter(p => inM(p.purchase_date)).map(p => ({ Date: p.purchase_date, Supplier: p.supplier?.name, Reference: p.reference, Total: p.total_cost, Paid: p.amount_paid || 0, Owed: owedOn(p) })) },
     ]);

@@ -3,12 +3,16 @@ import { supabase, formatCurrency, formatDate, type Order } from './supabase';
 
 export const PARTNERS = ['Davide', 'Randima'];
 /** Money spent on goods for resale. Not a running cost: its cost reaches profit when the item is sold. */
-export const STOCK_CATEGORY = 'Stock purchase';
-export const EXPENSE_CATEGORIES = ['Shipping & delivery', STOCK_CATEGORY, 'Packaging', 'Advertising', 'Salaries & wages', 'Rent', 'Utilities', 'Platform & payment fees', 'Software & tools', 'Taxes & licences', 'Other'];
+export const STOCK_CATEGORY = 'Goods for resale';
+/** Older name for the same category - still recognised so old entries are never counted as running costs. */
+const LEGACY_STOCK_CATEGORY = 'Stock purchase';
+/** Freight / customs on an incoming shipment. Added into the product's landed cost, so it is not a running cost either. */
+export const IMPORT_CATEGORY = 'Import & freight';
+export const EXPENSE_CATEGORIES = ['Shipping & delivery', STOCK_CATEGORY, IMPORT_CATEGORY, 'Packaging', 'Advertising', 'Salaries & wages', 'Rent', 'Utilities', 'Platform & payment fees', 'Software & tools', 'Taxes & licences', 'Other'];
 
 /** Categories that count as running costs (everything except stock purchases). */
 export const OPERATING_CATEGORIES = EXPENSE_CATEGORIES.filter(c => c !== STOCK_CATEGORY);
-export const isStockExpense = (e: { category: string }) => e.category === STOCK_CATEGORY;
+export const isStockExpense = (e: { category: string }) => e.category === STOCK_CATEGORY || e.category === LEGACY_STOCK_CATEGORY || e.category === IMPORT_CATEGORY;
 
 export type Expense = {
   id: string; expense_date: string; category: string; description: string | null; amount: number;
@@ -16,7 +20,30 @@ export type Expense = {
   invoice_path?: string | null; invoice_name?: string | null;
 };
 export type PartnerTx = { id: string; tx_date: string; partner: string; kind: 'contribution' | 'withdrawal'; amount: number; note: string | null };
-export type OrderCost = { order_id: string; delivery_cost: number; payment_fee: number };
+export type OrderCost = { order_id: string; delivery_cost: number; payment_fee: number; received_by?: string | null; received_at?: string | null };
+export type PurchasePayment = { id: string; purchase_id: string; pay_date: string; amount: number; paid_by: string | null; method: string | null; reference: string | null; note: string | null };
+export type Refund = { id: string; order_id: string; refund_date: string; amount: number; refunded_by: string | null; method: string | null; reason: string | null };
+export type ItemCost = { order_item_id: string; unit_cost: number };
+
+// ---- Sri Lanka time (UTC+5:30, no daylight saving) ----------------------------------------------
+// Months and date ranges must follow the shop's clock, not UTC, or late-night orders land in the wrong month.
+const LK_OFFSET_MS = 5.5 * 3600 * 1000;
+/** 'YYYY-MM-DD' of a timestamp as seen in Sri Lanka. Plain dates pass through unchanged. */
+export const lkDate = (iso: string) => (iso.length <= 10 ? iso : new Date(new Date(iso).getTime() + LK_OFFSET_MS).toISOString().slice(0, 10));
+export const lkMonth = (iso: string) => lkDate(iso).slice(0, 7);
+export const toYmd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/** Cost of an order line: the cost saved when it was sold, else today's product cost. */
+export const lineCost = (
+  item: { id: string; product_id: string | null; quantity: number },
+  snap: Map<string, number>,
+  prod: Map<string, { landed_cost?: number; supplier_cost?: number }>,
+) => {
+  const saved = snap.get(item.id);
+  if (saved !== undefined) return saved * item.quantity;
+  const p = item.product_id ? prod.get(item.product_id) : undefined;
+  return Number(p?.landed_cost || p?.supplier_cost || 0) * item.quantity;
+};
 export type Budget = { category: string; monthly_limit: number };
 export type Recurring = {
   id: string; category: string; description: string | null; amount: number; paid_by: string | null; paid_to: string | null;
