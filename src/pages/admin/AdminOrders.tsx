@@ -13,6 +13,7 @@ import { Button } from '../../components/ui/Button';
 import { Input, Select } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { Badge } from '../../components/ui/Badge';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 const STATUS_OPTIONS: OrderStatus[] = ['pending','confirmed','processing','packed','shipped','delivered','cancelled','returned'];
 
@@ -122,6 +123,27 @@ const AdminOrders: React.FC = () => {
         <Input type="date" value={to} onChange={e => setTo(e.target.value)} className="!w-40" title="To date" />
       </div>
 
+      {/* phones: one card per order */}
+      <div className="md:hidden space-y-3">
+        {loading ? <p className="py-8 text-center text-ink-400">Loading…</p> : filtered.length === 0 ? <p className="py-8 text-center text-ink-400">No orders found</p> : filtered.map(o => (
+          <button key={o.id} onClick={() => openOrder(o)} className="block w-full rounded-3xl border border-ink-100 bg-white p-4 text-left shadow-soft active:bg-ink-50">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="font-extrabold text-ink-900">{o.order_number}</p>
+                <p className="text-xs font-semibold text-ink-400">{formatDate(o.placed_at)} · {o.payment_method === 'cod' ? 'Cash on delivery' : 'Bank transfer'}</p>
+              </div>
+              <p className="font-extrabold text-ink-900">{formatCurrency(Number(o.total_amount), currency)}</p>
+            </div>
+            <p className="mt-1.5 text-sm text-ink-700">{o.customer_name} · {o.phone} · {o.items?.length || 0} item(s)</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Badge className={ORDER_STATUS_STYLES[o.status]}>{ORDER_STATUS_LABELS[o.status]}</Badge>
+              <Badge color={o.payment_status === 'paid' ? 'green' : o.payment_status === 'pending' ? 'sunshine' : 'red'}>{o.payment_status}</Badge>
+              <span className="ml-auto text-xs font-extrabold text-mint-700">Open →</span>
+            </div>
+          </button>
+        ))}
+      </div>
+      <div className="hidden md:block">
       <Table head={['Order', 'Customer', 'Items', 'Total', 'Payment', 'Status', 'Placed', '']}>
         {loading ? <tr><Td className="text-center py-8 text-ink-400">Loading…</Td></tr> :
         filtered.length === 0 ? <tr><Td className="text-center py-8 text-ink-400">No orders found</Td></tr> :
@@ -138,6 +160,7 @@ const AdminOrders: React.FC = () => {
           </tr>
         ))}
       </Table>
+      </div>
 
       <OrderModal order={selected} onClose={closeOrder} onStatus={updateStatus} onVerify={verifyPayment} onSetPaid={setPaid} />
     </div>
@@ -148,6 +171,7 @@ const AdminOrders: React.FC = () => {
 const OrderModal: React.FC<{ order: Order | null; onClose: () => void; onStatus: (o: Order, s: OrderStatus) => void; onVerify: (o: Order) => void; onSetPaid: (o: Order, paid: boolean) => void }> = ({ order, onClose, onStatus, onVerify, onSetPaid }) => {
   const { currency, settings } = useSettings();
   const { success, error } = useToast();
+  const ask = useConfirm();
   const [tracking, setTracking] = useState('');
   const [delivery, setDelivery] = useState('');
   const [fee, setFee] = useState('');
@@ -187,7 +211,7 @@ const OrderModal: React.FC<{ order: Order | null; onClose: () => void; onStatus:
     success(editRefund ? 'Refund updated' : 'Refund recorded'); setEditRefund(null); setRf({ amount: '', by: '', reason: '', from: 'fund' }); loadRefunds(order.id);
   };
   const removeRefund = async (r: Refund) => {
-    if (!confirm('Delete this refund entry?')) return;
+    if (!(await ask({ message: 'Delete this refund entry?', danger: true, confirmLabel: 'Delete' }))) return;
     if (r.receipt_path) await supabase.storage.from('invoices').remove([r.receipt_path]);
     const { error: e } = await supabase.from('order_refunds').delete().eq('id', r.id);
     if (e) error(e.message); else if (order) loadRefunds(order.id);
@@ -271,7 +295,7 @@ const OrderModal: React.FC<{ order: Order | null; onClose: () => void; onStatus:
               <Button size="sm" className="mt-3 w-full" onClick={() => onSetPaid(order, true)}><CheckCircle2 size={15} /> Mark as paid (cash received)</Button>
             )}
             {order.payment_status === 'paid' && (
-              <button type="button" onClick={() => { if (confirm('Mark this order as NOT paid?')) onSetPaid(order, false); }} className="block mt-2 text-[11px] font-bold text-ink-400 hover:text-red-500">Mark as not paid (undo)</button>
+              <button type="button" onClick={async () => { if ((await ask({ message: 'Mark this order as NOT paid?', danger: true, confirmLabel: 'Mark not paid' }))) onSetPaid(order, false); }} className="block mt-2 text-[11px] font-bold text-ink-400 hover:text-red-500">Mark as not paid (undo)</button>
             )}
           </div>
 

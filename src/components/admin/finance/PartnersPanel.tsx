@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2, Pencil, ArrowDownToLine, ArrowUpFromLine, AlertTriangle } from 'lucide-react';
 import { supabase, formatDate, uploadInvoice } from '../../../lib/supabase';
 import { InvoiceControl } from '../InvoiceControl';
 import { Paperclip } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { PARTNERS, computeFund, fromFund, type Expense, type PartnerTx, type PurchasePayment, type Refund } from '../../../lib/finance';
 import { useToast } from '../../../contexts/ToastContext';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -10,6 +11,7 @@ import { Table, Td } from '../ui';
 import { Button } from '../../ui/Button';
 import { Modal } from '../../ui/Modal';
 import { Input, Select, Field } from '../../ui/Input';
+import { useConfirm } from '../../../contexts/ConfirmContext';
 
 const blank = { tx_date: new Date().toISOString().slice(0, 10), partner: '', kind: 'contribution', amount: '', note: '' };
 
@@ -28,6 +30,7 @@ type Props = {
  */
 export const PartnersPanel: React.FC<Props> = ({ txs, expenses, supplierPayments, refunds, salesHeld, money, reload }) => {
   const { success, error } = useToast();
+  const ask = useConfirm();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(blank);
@@ -35,6 +38,9 @@ export const PartnersPanel: React.FC<Props> = ({ txs, expenses, supplierPayments
   const [file, setFile] = useState<File | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const openNew = () => { setEditId(null); setForm(blank); setFile(null); setOpen(true); };
+  const [sp, setSp] = useSearchParams();
+  // "+ New → Deposit / withdrawal" arrives as ?new=entry
+  useEffect(() => { if (sp.get('new') === 'entry') { openNew(); sp.delete('new'); setSp(sp, { replace: true }); } }, [sp]);
   const openEdit = (t: PartnerTx) => {
     setEditId(t.id); setFile(null);
     setForm({ tx_date: t.tx_date, partner: t.partner, kind: t.kind, amount: String(t.amount), note: t.note || '' });
@@ -81,7 +87,7 @@ export const PartnersPanel: React.FC<Props> = ({ txs, expenses, supplierPayments
     success('Recorded'); setOpen(false); setForm(blank); setFile(null); reload();
   };
   const remove = async (t: PartnerTx) => {
-    if (!confirm(`Delete this ${money(Number(t.amount))} ${t.kind}?`)) return;
+    if (!(await ask({ message: `Delete this ${money(Number(t.amount))} ${t.kind}?`, danger: true, confirmLabel: 'Delete' }))) return;
     const { error: e } = await supabase.from('partner_transactions').delete().eq('id', t.id);
     if (e) error(e.message); else { if (t.receipt_path) await supabase.storage.from('invoices').remove([t.receipt_path]); reload(); }
   };

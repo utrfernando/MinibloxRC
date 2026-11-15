@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet, Link, useLocation } from 'react-router-dom';
 import { AttentionBell } from '../admin/AttentionBell';
+import { QuickAdd } from '../admin/QuickAdd';
 import {
   LayoutDashboard, Package, FolderTree, Boxes, ShoppingCart, Users,
   TicketPercent, Image as ImageIcon, Globe, Settings, MessageSquare,
@@ -8,6 +9,24 @@ import {
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useSettings } from '../../contexts/SettingsContext';
+
+// Browser-tab titles, so several admin tabs can be told apart ("Orders · MinibloxRC Admin")
+const SECTION_TITLES: Record<string, string> = {
+  '': 'Overview', products: 'Products', categories: 'Categories', inventory: 'Inventory & Purchases', suppliers: 'Suppliers',
+  orders: 'Orders', discounts: 'Discount Codes', promotions: 'Promotions', finance: 'Finance', users: 'Users & Access',
+  customers: 'Customers', messages: 'Messages', website: 'Website', settings: 'Store Settings',
+};
+const SUB_TITLES: Record<string, Record<string, string>> = {
+  finance: { expenses: 'Expenses', partners: 'Partners & fund', suppliers: 'Supplier payments', shipments: 'Shipments', profit: 'Profit reports', records: 'Records & backup' },
+  inventory: { history: 'Movement history', purchases: 'Purchases' },
+  settings: { details: 'Store details', bank: 'Payments & bank', alerts: 'Order alerts' },
+};
+export const adminTitle = (pathname: string) => {
+  const [section = '', sub = ''] = pathname.split('/').filter(Boolean).slice(1);
+  const base = SECTION_TITLES[section] ?? 'Admin';
+  const detail = SUB_TITLES[section]?.[sub] ?? (sub === 'new' ? 'Add new' : sub ? 'Details' : '');
+  return detail ? `${detail} · ${base}` : base;
+};
 
 const NAV_GROUPS = [
   { title: 'Dashboard', items: [
@@ -42,6 +61,8 @@ const AdminLayout: React.FC = () => {
   const { storeName } = useSettings();
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
+  useEffect(() => { document.title = `${adminTitle(pathname)} · ${storeName} Admin`; }, [pathname, storeName]);
+  useEffect(() => { const original = document.title; return () => { document.title = original.includes(' Admin') ? `${storeName} — Small Things. Big Smiles.` : original; }; }, [storeName]);
 
   const sidebar = (
     <div className="flex flex-col h-full">
@@ -99,10 +120,10 @@ const AdminLayout: React.FC = () => {
         <div className="lg:hidden sticky top-0 z-30 bg-ink-900 text-white flex items-center gap-3 px-4 h-14">
           <button onClick={() => setOpen(true)} className="p-2"><Menu size={22} /></button>
           <span className="font-display font-bold">{storeName} Admin</span>
-          <span className="ml-auto"><AttentionBell tone="dark" refreshKey={pathname} /></span>
+          <span className="ml-auto flex items-center gap-2"><QuickAdd compact /><AttentionBell tone="dark" refreshKey={pathname} /></span>
         </div>
-        <div className="hidden lg:flex justify-end items-center px-8 pt-4 max-w-[1400px] mx-auto"><AttentionBell refreshKey={pathname} /></div>
-        <main className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">
+        <div className="hidden lg:flex justify-end items-center gap-2 px-8 pt-4 max-w-[1400px] mx-auto"><QuickAdd /><AttentionBell refreshKey={pathname} /></div>
+        <main className="admin-touch p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">
           <React.Suspense fallback={<div className="py-20 text-center font-bold text-ink-400">Loading…</div>}><Outlet /></React.Suspense>
         </main>
       </div>

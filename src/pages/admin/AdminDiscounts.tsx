@@ -8,12 +8,14 @@ import { Button } from '../../components/ui/Button';
 import { Input, Select, Field } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { Badge } from '../../components/ui/Badge';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 const empty = { code: '', description: '', discount_type: 'percent' as 'percent' | 'fixed', discount_value: 10, min_order_amount: 0, max_uses: '', starts_at: '', ends_at: '' };
 
 const AdminDiscounts: React.FC = () => {
   const { currency } = useSettings();
   const { success, error } = useToast();
+  const ask = useConfirm();
   const [codes, setCodes] = useState<DiscountCode[]>([]);
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<DiscountCode | null>(null);
@@ -55,7 +57,7 @@ const AdminDiscounts: React.FC = () => {
     load();
   };
   const remove = async (c: DiscountCode) => {
-    if (!confirm(`Delete code ${c.code}?`)) return;
+    if (!(await ask({ message: `Delete code ${c.code}?`, danger: true, confirmLabel: 'Delete' }))) return;
     await supabase.from('discount_codes').delete().eq('id', c.id);
     success('Deleted'); load();
   };

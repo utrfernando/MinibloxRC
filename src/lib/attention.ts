@@ -47,13 +47,13 @@ export async function loadAttention(currency = 'LKR'): Promise<AttentionItem[]> 
   const store: any = setting('store'); const bank: any = setting('bank');
   if (store.checkout_enabled === false) push({ key: 'checkout-off', level: 'high', count: 1, title: 'Checkout is switched OFF', detail: 'Customers cannot place orders right now.', to: '/admin/settings', action: 'Open Store Settings' });
   const badContact = [PLACEHOLDER_PHONE.test(String(store.contact_phone || '')) ? 'phone' : '', PLACEHOLDER_PHONE.test(String(store.whatsapp || '')) ? 'WhatsApp' : '', String(store.contact_email || '') === DEFAULT_EMAIL ? 'email' : ''].filter(Boolean);
-  push({ key: 'store-contact', level: 'medium', count: badContact.length, title: 'Store contact details are still placeholders', detail: `Your ${badContact.join(', ')} still show the sample value. Customers, invoices and the chat helper use these.`, to: '/admin/settings', action: 'Fix in Store Settings' });
+  push({ key: 'store-contact', level: 'medium', count: badContact.length, title: 'Store contact details are still placeholders', detail: `Your ${badContact.join(', ')} still show the sample value. Customers, invoices and the chat helper use these.`, to: '/admin/settings/details', action: 'Fix in Store Settings' });
   const fakeBank = blank(bank.account_number) || /^[xX*#\-\s0]+$/.test(String(bank.account_number));
-  push({ key: 'bank-details', level: 'high', count: fakeBank ? 1 : 0, title: blank(bank.account_number) ? 'Bank transfer details are empty' : 'Bank account number is still a placeholder', detail: 'Customers who choose bank transfer are shown these details at checkout — they cannot pay you without real ones.', to: '/admin/settings', action: 'Add bank details' });
+  push({ key: 'bank-details', level: 'high', count: fakeBank ? 1 : 0, title: blank(bank.account_number) ? 'Bank transfer details are empty' : 'Bank account number is still a placeholder', detail: 'Customers who choose bank transfer are shown these details at checkout — they cannot pay you without real ones.', to: '/admin/settings/bank', action: 'Add bank details' });
 
   const al: any = alerts.data;
   const alertsOk = !alerts.error && al && al.enabled !== false && !blank(al.telegram_bot_token) && !blank(al.telegram_chat_id);
-  push({ key: 'order-alerts', level: 'medium', count: alertsOk ? 0 : 1, title: 'Order alerts on Telegram are not set up', detail: alerts.error ? 'Run migration 0015 in Supabase, then set it up in Store Settings.' : 'Get a phone message the moment a customer orders.', to: '/admin/settings#order-alerts', action: 'Set up alerts' });
+  push({ key: 'order-alerts', level: 'medium', count: alertsOk ? 0 : 1, title: 'Order alerts on Telegram are not set up', detail: alerts.error ? 'Run migration 0015 in Supabase, then set it up in Store Settings.' : 'Get a phone message the moment a customer orders.', to: '/admin/settings/alerts', action: 'Set up alerts' });
 
   // ---- business fund: deposits in, payments out
   if (!fundTx.error && !fundExp.error && !fundPay.error && !fundRef.error) {

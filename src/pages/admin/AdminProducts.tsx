@@ -14,10 +14,12 @@ import { useNavigate } from 'react-router-dom';
 import { useAdminSub } from '../../lib/adminRoute';
 import BulkUploadModal from '../../components/admin/BulkUploadModal';
 import { cn } from '../../lib/utils';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 const AdminProducts: React.FC = () => {
   const { currency } = useSettings();
   const { success } = useToast();
+  const ask = useConfirm();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,7 +63,7 @@ const AdminProducts: React.FC = () => {
     success('Product archived'); load();
   };
   const remove = async (p: Product) => {
-    if (!confirm(`Permanently delete "${p.name}"? This cannot be undone.`)) return;
+    if (!(await ask({ message: `Permanently delete "${p.name}"? This cannot be undone.`, danger: true, confirmLabel: 'Delete' }))) return;
     await supabase.from('products').delete().eq('id', p.id);
     success('Product deleted'); load();
   };
@@ -87,6 +89,33 @@ const AdminProducts: React.FC = () => {
         <Button variant="secondary" onClick={load}>Refresh</Button>
       </div>
 
+      {/* phones: one card per product, all actions visible (no sideways scrolling) */}
+      <div className="md:hidden space-y-3">
+        {loading ? <p className="py-8 text-center text-ink-400">Loading…</p> : products.length === 0 ? <p className="py-8 text-center text-ink-400">No products found</p> : products.map(p => (
+          <div key={p.id} className="rounded-3xl border border-ink-100 bg-white p-4 shadow-soft">
+            <div className="flex gap-3">
+              <div className="w-16 h-16 rounded-2xl overflow-hidden shrink-0"><Img src={primaryImage(p)} alt="" iconClassName="w-6 h-6" /></div>
+              <div className="min-w-0 flex-1">
+                <p className="font-bold text-ink-900 leading-snug">{p.name}</p>
+                <p className="text-xs text-ink-400">{p.sku || '—'}{!(p.invoice_no || '').trim() && <span className="ml-2 rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-extrabold text-red-500">no invoice no.</span>}</p>
+                <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                  <span className="font-extrabold text-ink-900">{formatCurrency(unitPrice(p), currency)}</span>
+                  {hasDiscount(p) && <span className="text-xs text-ink-400 line-through">{formatCurrency(p.selling_price, currency)}</span>}
+                  <span className={cn('inline-flex rounded-full px-2.5 py-1 text-xs font-extrabold', stockBadge(p.stock_quantity, p.low_stock_threshold))}>{p.stock_quantity <= 0 ? 'Out of stock' : `${p.stock_quantity} in stock`}</span>
+                  <Badge color={p.status === 'published' ? 'green' : p.status === 'draft' ? 'sunshine' : 'ink'}>{p.status}</Badge>
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-4 gap-2 text-xs font-extrabold">
+              <button onClick={() => navigate(`/admin/products/${p.id}`)} className="flex flex-col items-center gap-1 rounded-2xl bg-mint-50 py-2 text-mint-700"><Pencil size={16} />Edit</button>
+              {p.status === 'published' ? <a href={`/product/${p.id}`} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1 rounded-2xl bg-ink-50 py-2 text-ink-600"><Eye size={16} />View</a> : <span className="rounded-2xl bg-ink-50/50 py-2 text-center text-ink-300"><Eye size={16} className="mx-auto mb-1" />View</span>}
+              {p.status !== 'archived' ? <button onClick={() => archive(p)} className="flex flex-col items-center gap-1 rounded-2xl bg-sunshine-50 py-2 text-sunshine-700"><Archive size={16} />Archive</button> : <span className="rounded-2xl bg-ink-50/50 py-2 text-center text-ink-300"><Archive size={16} className="mx-auto mb-1" />Archived</span>}
+              <button onClick={() => remove(p)} className="flex flex-col items-center gap-1 rounded-2xl bg-red-50 py-2 text-red-500"><Trash2 size={16} />Delete</button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="hidden md:block">
       <Table head={['Product', 'Category', 'Price', 'Stock', 'Status', 'Flags', 'Actions']}>
         {loading ? (
           <tr><Td className="text-center text-ink-400 py-8" >Loading…</Td></tr>
@@ -134,6 +163,7 @@ const AdminProducts: React.FC = () => {
           </tr>
         ))}
       </Table>
+      </div>
 
       <ProductForm open={formOpen} onClose={() => navigate('/admin/products')} product={editing} onSaved={load} />
     </div>

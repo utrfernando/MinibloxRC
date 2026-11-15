@@ -9,6 +9,7 @@ import { AdminHeader } from '../../components/admin/ui';
 import { SupplierFormModal } from '../../components/admin/SupplierFormModal';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 type PurchaseRow = { supplier_id: string | null; total_cost: number; amount_paid: number | null };
 
@@ -16,6 +17,7 @@ type PurchaseRow = { supplier_id: string | null; total_cost: number; amount_paid
 const AdminSuppliers: React.FC = () => {
   const { currency } = useSettings();
   const { success, error } = useToast();
+  const ask = useConfirm();
   const navigate = useNavigate();
   const sub = useAdminSub();
   const money = (n: number) => formatCurrency(n, currency);
@@ -53,7 +55,7 @@ const AdminSuppliers: React.FC = () => {
   const remove = async (s: Supplier) => {
     const t = totals[s.id]; const prods = productCount[s.id] || 0;
     if ((t?.n || 0) > 0 || prods > 0) return error(`${s.name} has ${prods} product(s) and ${t?.n || 0} purchase(s) linked to it, so it can't be deleted. Edit it instead.`);
-    if (!confirm(`Delete supplier "${s.name}"? This cannot be undone.`)) return;
+    if (!(await ask({ message: `Delete supplier "${s.name}"? This cannot be undone.`, danger: true, confirmLabel: 'Delete' }))) return;
     const { error: e } = await supabase.from('suppliers').delete().eq('id', s.id);
     if (e) error(e.message); else { success('Supplier deleted'); load(); }
   };

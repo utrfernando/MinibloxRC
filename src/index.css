@@ -91,3 +91,10 @@ body {
 .line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: box; overflow: hidden; }
 .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: box; overflow: hidden; }
 .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: box; overflow: hidden; }
+
+/* Admin on a phone: finger-sized buttons and fields (the admin pages are wrapped in .admin-touch) */
+@media (max-width: 767px) {
+  .admin-touch button, .admin-touch [role="button"] { min-height: 38px; min-width: 38px; }
+  .admin-touch input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), .admin-touch select { min-height: 44px; }
+  .admin-touch table button, .admin-touch table a { min-height: 36px; min-width: 36px; display: inline-flex; align-items: center; justify-content: center; }
+}

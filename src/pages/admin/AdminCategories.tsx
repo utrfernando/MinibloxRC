@@ -10,9 +10,11 @@ import { Input, Field } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { Badge } from '../../components/ui/Badge';
 import { ProductImage as Img } from '../../components/ui/Feedback';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 const AdminCategories: React.FC = () => {
   const { success, error } = useToast();
+  const ask = useConfirm();
   const [categories, setCategories] = useState<Category[]>([]);
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
@@ -35,7 +37,7 @@ const AdminCategories: React.FC = () => {
   };
 
   const remove = async (c: Category) => {
-    if (!confirm(`Delete category "${c.name}"? Products in it become uncategorised.`)) return;
+    if (!(await ask({ message: `Delete category "${c.name}"? Products in it become uncategorised.`, danger: true, confirmLabel: 'Delete' }))) return;
     const { error: e } = await supabase.from('categories').delete().eq('id', c.id);
     if (e) error(e.message); else { success('Deleted'); load(); }
   };

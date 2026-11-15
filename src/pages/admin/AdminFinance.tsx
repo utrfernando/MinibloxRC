@@ -21,6 +21,7 @@ import { SupplierPanel, owedOn, type PurchasePay } from '../../components/admin/
 import { ProfitPanel } from '../../components/admin/finance/ProfitPanel';
 import { ShipmentsPanel } from '../../components/admin/finance/ShipmentsPanel';
 import { RecordsPanel } from '../../components/admin/finance/RecordsPanel';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 type Tab = 'overview' | 'expenses' | 'partners' | 'suppliers' | 'shipments' | 'profit' | 'records';
 const TABS: { k: Tab; l: string }[] = [
@@ -54,6 +55,7 @@ const AdminFinance: React.FC = () => {
   const { currency } = useSettings();
   const { user } = useAuth();
   const { success, error } = useToast();
+  const ask = useConfirm();
   const money = (n: number) => formatCurrency(n, currency);
 
   const [range, setRange] = useState('month');
@@ -61,7 +63,7 @@ const AdminFinance: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [purchases, setPurchases] = useState<PurchasePay[]>([]);
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const sub = useAdminSub();
   // each tab has its own address: /admin/finance, /admin/finance/partners, … (the old ?tab= links still work)
@@ -219,6 +221,8 @@ const AdminFinance: React.FC = () => {
   const shownExp = who === 'all' ? f.exp : f.exp.filter(e => (who === 'Unassigned' ? !e.paid_by : e.paid_by === who));
 
   const openNew = () => { setEditId(null); setForm(blank); setFile(null); setFormOpen(true); };
+  // "+ New → Add expense" arrives as ?new=expense
+  useEffect(() => { if (params.get('new') === 'expense' && !loading) { openNew(); params.delete('new'); setParams(params, { replace: true }); } }, [params, loading]);
   const openEdit = (x: Expense) => {
     setEditId(x.id); setFile(null);
     setForm({ expense_date: x.expense_date, category: x.category, description: x.description || '', amount: String(x.amount), paid_by: x.paid_by || '', paid_from: x.paid_from || 'own', paid_to: x.paid_to || '', payment_method: x.payment_method || 'cash', reference: x.reference || '' });
@@ -250,7 +254,7 @@ const AdminFinance: React.FC = () => {
     finally { setSaving(false); }
   };
   const removeExpense = async (x: Expense) => {
-    if (!confirm(`Delete this ${money(Number(x.amount))} expense?`)) return;
+    if (!(await ask({ message: `Delete this ${money(Number(x.amount))} expense?`, danger: true, confirmLabel: 'Delete' }))) return;
     await supabase.from('expenses').delete().eq('id', x.id);
     if (x.invoice_path) await supabase.storage.from('invoices').remove([x.invoice_path]);
     load();
@@ -269,9 +273,9 @@ const AdminFinance: React.FC = () => {
     <div>
       <AdminHeader title="Finance" subtitle="Sales, costs, expenses and profit in one place"
         actions={<>
-          <Select value={range} onChange={e => setRange(e.target.value)} className="!py-2">{RANGES.map(r => <option key={r.v} value={r.v}>{r.l}</option>)}</Select>
-          <Button variant="outline" onClick={exportOrders}><Download size={16} /> Sales CSV</Button>
-          <Button onClick={openNew} disabled={missingTable}><Plus size={16} /> Add Expense</Button>
+          {['overview', 'expenses', 'profit'].includes(tab) && <Select value={range} onChange={e => setRange(e.target.value)} className="!py-2" aria-label="Date range">{RANGES.map(r => <option key={r.v} value={r.v}>{r.l}</option>)}</Select>}
+          {tab === 'overview' && <Button variant="outline" onClick={exportOrders}><Download size={16} /> Sales CSV</Button>}
+          {['overview', 'expenses'].includes(tab) && <Button onClick={openNew} disabled={missingTable}><Plus size={16} /> Add Expense</Button>}
         </>} />
 
       {missingTable && (

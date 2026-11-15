@@ -8,10 +8,12 @@ import { PasswordActions } from '../../components/admin/PasswordActions';
 import { Input, Select } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 const AdminUsers: React.FC = () => {
   const { user: me } = useAuth();
   const { success, error } = useToast();
+  const ask = useConfirm();
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
@@ -28,7 +30,7 @@ const AdminUsers: React.FC = () => {
 
   const changeRole = async (u: Profile, next: 'admin' | 'customer') => {
     if (u.id === me?.id) return error("You can't change your own role.");
-    if (!confirm(`${next === 'admin' ? 'Give admin access to' : 'Remove admin access from'} ${u.email}?`)) return;
+    if (!(await ask({ message: `${next === 'admin' ? 'Give admin access to' : 'Remove admin access from'} ${u.email}?`, danger: next !== 'admin', confirmLabel: next === 'admin' ? 'Give admin access' : 'Remove admin' }))) return;
     const { error: e } = await supabase.from('profiles').update({ role: next }).eq('id', u.id);
     if (e) return error(e.message);
     await supabase.from('user_roles').delete().eq('user_id', u.id);

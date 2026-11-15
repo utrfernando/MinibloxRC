@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { CartProvider } from './contexts/CartContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { ToastProvider } from './contexts/ToastContext';
+import { ConfirmProvider } from './contexts/ConfirmContext';
 import StoreLayout from './components/layout/StoreLayout';
 import Home from './pages/Home';
 
@@ -98,6 +99,7 @@ const App: React.FC = () => {
       <SettingsProvider>
         <CartProvider>
           <ToastProvider>
+            <ConfirmProvider>
             <Router>
               <Suspense fallback={<PageLoading />}>
               <Routes>
@@ -140,6 +142,7 @@ const App: React.FC = () => {
               </Routes>
               </Suspense>
             </Router>
+          </ConfirmProvider>
           </ToastProvider>
         </CartProvider>
       </SettingsProvider>

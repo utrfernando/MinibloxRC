@@ -13,6 +13,7 @@ import { Button } from '../../ui/Button';
 import { Modal } from '../../ui/Modal';
 import { Input, Select, Field } from '../../ui/Input';
 import { Badge } from '../../ui/Badge';
+import { useConfirm } from '../../../contexts/ConfirmContext';
 
 export type PurchasePay = Purchase & { amount_paid?: number | null; last_paid_date?: string | null; extra_costs?: number | null };
 
@@ -114,11 +115,12 @@ const EditPaymentModal: React.FC<{ payment: PurchasePayment | null; onClose: () 
 /** All payments made against one purchase, newest first. A wrong entry can be deleted and re-entered. */
 const HistoryModal: React.FC<{ purchase: PurchasePay | null; payments: PurchasePayment[]; money: (n: number) => string; onClose: () => void; onChanged: () => void }> = ({ purchase, payments, money, onClose, onChanged }) => {
   const { error } = useToast();
+  const ask = useConfirm();
   const [editing, setEditing] = useState<PurchasePayment | null>(null);
   if (!purchase) return null;
   const list = payments.filter(p => p.purchase_id === purchase.id).sort((a, b) => b.pay_date.localeCompare(a.pay_date));
   const remove = async (p: PurchasePayment) => {
-    if (!confirm(`Delete this ${money(Number(p.amount))} payment? The amount owed will go back up.`)) return;
+    if (!(await ask({ message: `Delete this ${money(Number(p.amount))} payment? The amount owed will go back up.`, danger: true, confirmLabel: 'Delete' }))) return;
     const { error: e } = await supabase.from('purchase_payments').delete().eq('id', p.id);
     if (e) error(e.message); else { if (p.receipt_path) await supabase.storage.from('invoices').remove([p.receipt_path]); onChanged(); }
   };
@@ -153,7 +155,7 @@ export const SupplierPanel: React.FC<{
   const [pay, setPay] = useState<PurchasePay | null>(null);
   const [hist, setHist] = useState<PurchasePay | null>(null);
   const [edit, setEdit] = useState<PurchasePay | null>(null);
-  const [showPaid, setShowPaid] = useState(false);
+  const [showPaid, setShowPaid] = useState(true);
   const totalOwed = purchases.reduce((s, p) => s + owedOn(p), 0);
   const bySupplier = new Map<string, number>();
   purchases.forEach(p => { const o = owedOn(p); if (o > 0) bySupplier.set(p.supplier?.name || 'No supplier', (bySupplier.get(p.supplier?.name || 'No supplier') || 0) + o); });

@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { Paperclip, FileText, Trash2, Replace } from 'lucide-react';
 import { supabase, uploadInvoice, openInvoice } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 type Table = 'expenses' | 'purchases' | 'partner_transactions' | 'purchase_payments' | 'order_refunds';
 /** Expenses and purchases keep an invoice; deposits, supplier payments and refunds keep a receipt. */
@@ -12,6 +13,7 @@ export const InvoiceControl: React.FC<{
   table: Table; id: string; path: string | null | undefined; name: string | null | undefined; onChanged: () => void;
 }> = ({ table, id, path, name, onChanged }) => {
   const { success, error } = useToast();
+  const ask = useConfirm();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const c = COLS(table);
@@ -30,7 +32,7 @@ export const InvoiceControl: React.FC<{
   };
 
   const remove = async () => {
-    if (!path || !confirm(`Remove this ${c.word.toLowerCase()} file?`)) return;
+    if (!path || !(await ask({ message: `Remove this ${c.word.toLowerCase()} file?`, danger: true, confirmLabel: 'Remove' }))) return;
     await supabase.from(table).update({ [c.path]: null, [c.name]: null }).eq('id', id);
     await supabase.storage.from('invoices').remove([path]);
     onChanged();

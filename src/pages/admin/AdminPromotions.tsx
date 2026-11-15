@@ -10,12 +10,14 @@ import { Input, Select, Field } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { Badge } from '../../components/ui/Badge';
 import { ProductImage as Img } from '../../components/ui/Feedback';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 const empty = { title: '', subtitle: '', image_url: '', cta_label: '', cta_link: '', placement: 'home_hero', sort_order: 0, is_active: true, starts_at: '', ends_at: '' };
 
 const AdminPromotions: React.FC = () => {
   const { authUserId } = useAuth();
   const { success, error } = useToast();
+  const ask = useConfirm();
   const [banners, setBanners] = useState<Banner[]>([]);
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Banner | null>(null);
@@ -62,7 +64,7 @@ const AdminPromotions: React.FC = () => {
   };
 
   const remove = async (b: Banner) => {
-    if (!confirm(`Delete banner "${b.title}"?`)) return;
+    if (!(await ask({ message: `Delete banner "${b.title}"?`, danger: true, confirmLabel: 'Delete' }))) return;
     await supabase.from('banners').delete().eq('id', b.id);
     success('Deleted'); load();
   };

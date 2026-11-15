@@ -7,12 +7,14 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { Button } from '../../ui/Button';
 import { Modal } from '../../ui/Modal';
 import { Input, Select, Field } from '../../ui/Input';
+import { useConfirm } from '../../../contexts/ConfirmContext';
 
 const blank = { category: EXPENSE_CATEGORIES[0], description: '', amount: '', paid_by: '', paid_to: '', payment_method: 'bank', day_of_month: '1' };
 
 /** Monthly repeating expenses (rent, software...). "Add due now" creates this month's entries once. */
 export const RecurringPanel: React.FC<{ items: Recurring[]; money: (n: number) => string; reload: () => void }> = ({ items, money, reload }) => {
   const { success, error } = useToast();
+  const ask = useConfirm();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(blank);
@@ -52,7 +54,7 @@ export const RecurringPanel: React.FC<{ items: Recurring[]; money: (n: number) =
   };
 
   const toggle = async (r: Recurring) => { await supabase.from('recurring_expenses').update({ active: !r.active }).eq('id', r.id); reload(); };
-  const remove = async (r: Recurring) => { if (confirm('Delete this recurring expense? Past entries stay.')) { await supabase.from('recurring_expenses').delete().eq('id', r.id); reload(); } };
+  const remove = async (r: Recurring) => { if ((await ask({ message: 'Delete this recurring expense? Past entries stay.', danger: true, confirmLabel: 'Delete' }))) { await supabase.from('recurring_expenses').delete().eq('id', r.id); reload(); } };
   const edit = (r: Recurring) => {
     setEditId(r.id);
     setForm({ category: r.category, description: r.description || '', amount: String(r.amount), paid_by: r.paid_by || '', paid_to: r.paid_to || '', payment_method: r.payment_method || 'bank', day_of_month: String(r.day_of_month) });

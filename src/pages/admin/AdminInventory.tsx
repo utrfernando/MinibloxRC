@@ -3,7 +3,7 @@ import { Plus, ArrowUpFromLine, Package, Truck } from 'lucide-react';
 import { InvoiceControl } from '../../components/admin/InvoiceControl';
 import { PARTNERS, IMPORT_CATEGORY, type PurchasePayment } from '../../lib/finance';
 import { PaidFromSelect } from '../../components/admin/finance/PaidFromSelect';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAdminSub } from '../../lib/adminRoute';
 import { EditPurchaseModal } from '../../components/admin/EditPurchaseModal';
 import { PaymentBadge, PaymentModal, owedOn, type PurchasePay } from '../../components/admin/finance/SupplierPanel';
@@ -17,6 +17,7 @@ import { Input, Select, Field, Textarea } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { Badge } from '../../components/ui/Badge';
 import { cn } from '../../lib/utils';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 type Tab = 'overview' | 'transactions' | 'purchases' | 'suppliers';
 
@@ -25,6 +26,9 @@ const AdminInventory: React.FC = () => {
   const { authUserId } = useAuth();
   const navigate = useNavigate();
   const sub = useAdminSub();
+  const [sp, setSp] = useSearchParams();
+  // "+ New → Record purchase" arrives as ?new=purchase
+  useEffect(() => { if (sp.get('new') === 'purchase') { setPurchaseModal(true); sp.delete('new'); setSp(sp, { replace: true }); } }, [sp, setSp]);
   // /admin/inventory  ·  /admin/inventory/history  ·  /admin/inventory/purchases   (suppliers have their own page)
   const tab: Tab = sub === 'history' ? 'transactions' : sub === 'purchases' ? 'purchases' : 'overview';
   const setTab = (t: Tab) => navigate(t === 'suppliers' ? '/admin/suppliers' : t === 'transactions' ? '/admin/inventory/history' : t === 'purchases' ? '/admin/inventory/purchases' : '/admin/inventory');
@@ -247,6 +251,7 @@ const AdjustModal: React.FC<{ product: Product | null; onClose: () => void; onSa
 // ------------------------------------------------------------------
 const PurchaseModal: React.FC<{ open: boolean; onClose: () => void; products: Product[]; suppliers: Supplier[]; existingRefs: string[]; userId: string | null; onSaved: () => void }> = ({ open, onClose, products, suppliers, existingRefs, userId, onSaved }) => {
   const { success, error } = useToast();
+  const ask = useConfirm();
   const [reference, setReference] = useState('');
   const [supplierId, setSupplierId] = useState('');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
@@ -268,7 +273,7 @@ const PurchaseModal: React.FC<{ open: boolean; onClose: () => void; products: Pr
     const valid = rows.filter(r => r.product_id && r.quantity > 0);
     if (!valid.length) { error('Add at least one item'); return; }
     if (!reference.trim()) { error('Enter the supplier invoice / order number — it links this shipment to its payments and products.'); return; }
-    if (existingRefs.includes(reference.trim().toLowerCase()) && !confirm(`A purchase with invoice no. "${reference.trim()}" already exists. Record this one anyway?`)) return;
+    if (existingRefs.includes(reference.trim().toLowerCase()) && !(await ask({ message: `A purchase with invoice no. "${reference.trim()}" already exists. Record this one anyway?`, danger: false, confirmLabel: 'Record anyway' }))) return;
     const paid = Math.min(Math.max(0, Number(paidNow) || 0), total);
     if (paid > 0 && !paidBy) { error('Choose which partner paid the supplier.'); return; }
     if (extra > 0 && !importPaidBy) { error('Choose which partner paid the freight / customs.'); return; }
