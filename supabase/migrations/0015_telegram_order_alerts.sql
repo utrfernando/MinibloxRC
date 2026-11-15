@@ -40,7 +40,8 @@ begin
   select net.http_post(
     url := 'https://api.telegram.org/bot' || btrim(s.telegram_bot_token) || '/sendMessage',
     headers := jsonb_build_object('Content-Type', 'application/json'),
-    body := jsonb_build_object('chat_id', btrim(s.telegram_chat_id), 'text', left(p_text, 3900), 'disable_web_page_preview', true)
+    body := jsonb_build_object('chat_id', btrim(s.telegram_chat_id), 'text', left(p_text, 3900), 'disable_web_page_preview', true),
+    timeout_milliseconds := 20000   -- default is 5s; a slow first connection was timing out
   ) into rid;
   return rid;
 end $$;

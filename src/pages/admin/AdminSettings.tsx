@@ -34,6 +34,11 @@ const AdminSettings: React.FC = () => {
   return (
     <div className="space-y-8">
       <AdminHeader title="Store Settings" subtitle="Contact info, delivery, payments & social links" />
+      <nav className="flex flex-wrap gap-2 -mt-3 mb-5 text-xs font-extrabold">
+        <span className="text-ink-400 self-center">Jump to:</span>
+        <a href="#order-alerts" className="rounded-full border border-sky-300 bg-sky-50 px-3 py-1 text-sky-700 hover:bg-sky-100">Order alerts (Telegram)</a>
+        <a href="#bank-details" className="rounded-full border border-mint-300 bg-mint-50 px-3 py-1 text-mint-700 hover:bg-mint-100">Bank transfer details</a>
+      </nav>
 
       <section className="rounded-4xl border border-ink-100 bg-white p-6 shadow-soft">
         <h2 className="font-display text-lg font-extrabold text-ink-900 mb-4">Store Information</h2>
@@ -78,7 +83,7 @@ const AdminSettings: React.FC = () => {
 
       <OrderAlertsCard />
 
-      <section className="rounded-4xl border border-ink-100 bg-white p-6 shadow-soft">
+      <section id="bank-details" className="rounded-4xl border border-ink-100 bg-white p-6 shadow-soft scroll-mt-20">
         <h2 className="font-display text-lg font-extrabold text-ink-900 mb-4">Bank Transfer Details</h2>
         <p className="text-sm text-ink-500 mb-4">Shown to customers who choose bank transfer at checkout.</p>
         <div className="grid sm:grid-cols-2 gap-4">

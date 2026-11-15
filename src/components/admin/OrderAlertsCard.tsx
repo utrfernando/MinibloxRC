@@ -20,6 +20,9 @@ export const OrderAlertsCard: React.FC = () => {
   const [chats, setChats] = useState<Chat[]>([]);
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
 
+  // arriving from the bell (/admin/settings#order-alerts): scroll straight to this card
+  useEffect(() => { if (window.location.hash === '#order-alerts') setTimeout(() => document.getElementById('order-alerts')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 400); }, []);
+
   useEffect(() => {
     supabase.from('alert_settings').select('*').eq('id', 1).maybeSingle().then(({ data, error: e }) => {
       if (e) { setMissing(true); return; }
@@ -81,9 +84,9 @@ export const OrderAlertsCard: React.FC = () => {
   };
 
   return (
-    <section className="rounded-4xl border border-ink-100 bg-white p-6 shadow-soft">
+    <section id="order-alerts" className="rounded-4xl border border-ink-100 bg-white p-6 shadow-soft scroll-mt-20">
       <h2 className="font-display text-lg font-extrabold text-ink-900 mb-1 flex items-center gap-2"><Send size={18} className="text-sky-500" /> Order alerts on Telegram</h2>
-      <p className="text-sm text-ink-500 mb-4">Get a message on your phone the moment a customer places an order. Free, and everyone in the Telegram group gets it.</p>
+      <p className="text-sm text-ink-500 mb-4">Get a message on your phone the moment a customer places an order. Free, and everyone on your team in the Telegram group gets it.</p>
 
       {missing && <div className="mb-4 rounded-3xl bg-sunshine-50 border border-sunshine-200 p-3 text-sm text-ink-800 flex gap-2"><AlertTriangle size={16} className="shrink-0 mt-0.5 text-sunshine-600" />Run <code>supabase/migrations/0015_telegram_order_alerts.sql</code> in the Supabase SQL Editor first.</div>}
 
@@ -91,7 +94,7 @@ export const OrderAlertsCard: React.FC = () => {
         <summary className="cursor-pointer font-extrabold">How to set it up (5 minutes)</summary>
         <ol className="mt-2 list-decimal pl-5 space-y-1">
           <li>In Telegram, search for <b>@BotFather</b>, send <b>/newbot</b>, pick a name, and copy the <b>token</b> it gives you.</li>
-          <li>Create a Telegram <b>group</b> with you and your sister, then add your new bot to it.</li>
+          <li>Create a Telegram <b>group</b> with you and your team (for example Davide and whoever packs orders), then add your new bot to it.</li>
           <li>Send any message in the group.</li>
           <li>Paste the token below and press <b>Find my chat</b>. Click your group to fill in the chat ID.</li>
           <li>Press <b>Save</b>, then <b>Send test message</b>.</li>

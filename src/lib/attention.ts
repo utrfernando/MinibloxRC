@@ -46,7 +46,7 @@ export async function loadAttention(currency = 'LKR'): Promise<AttentionItem[]> 
 
   const al: any = alerts.data;
   const alertsOk = !alerts.error && al && al.enabled !== false && !blank(al.telegram_bot_token) && !blank(al.telegram_chat_id);
-  push({ key: 'order-alerts', level: 'medium', count: alertsOk ? 0 : 1, title: 'Order alerts on Telegram are not set up', detail: alerts.error ? 'Run migration 0015 in Supabase, then set it up in Store Settings.' : 'Get a phone message the moment a customer orders.', to: '/admin/settings', action: 'Set up alerts' });
+  push({ key: 'order-alerts', level: 'medium', count: alertsOk ? 0 : 1, title: 'Order alerts on Telegram are not set up', detail: alerts.error ? 'Run migration 0015 in Supabase, then set it up in Store Settings.' : 'Get a phone message the moment a customer orders.', to: '/admin/settings#order-alerts', action: 'Set up alerts' });
 
   // ---- supplier purchases ----------------------------------------------------------------------
   const pu: any[] = purchases.data || [];
