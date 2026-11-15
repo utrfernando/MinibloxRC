@@ -87,6 +87,16 @@ const AdminOrders: React.FC = () => {
     } else error(e.message);
   };
 
+  // Cash on delivery has no slip to verify: mark it paid when the cash is in hand (or undo a mistake).
+  const setPaid = async (o: Order, paid: boolean) => {
+    const now = new Date().toISOString();
+    const { error: e } = await supabase.from('orders').update({ payment_status: paid ? 'paid' : 'pending' }).eq('id', o.id);
+    if (e) { error(e.message); return; }
+    const payment = o.payments?.[0];
+    if (payment) await supabase.from('payments').update(paid ? { status: 'paid', paid_at: now, verified_by: authUserId, verified_at: now } : { status: 'pending', paid_at: null }).eq('id', payment.id);
+    success(paid ? 'Marked as paid' : 'Marked as not paid'); setSelected(null); load();
+  };
+
   return (
     <div>
       <AdminHeader title="Orders" subtitle={`${filtered.length} order(s)`} />
@@ -121,13 +131,13 @@ const AdminOrders: React.FC = () => {
         ))}
       </Table>
 
-      <OrderModal order={selected} onClose={() => setSelected(null)} onStatus={updateStatus} onVerify={verifyPayment} />
+      <OrderModal order={selected} onClose={() => setSelected(null)} onStatus={updateStatus} onVerify={verifyPayment} onSetPaid={setPaid} />
     </div>
   );
 };
 
 // ------------------------------------------------------------------
-const OrderModal: React.FC<{ order: Order | null; onClose: () => void; onStatus: (o: Order, s: OrderStatus) => void; onVerify: (o: Order) => void }> = ({ order, onClose, onStatus, onVerify }) => {
+const OrderModal: React.FC<{ order: Order | null; onClose: () => void; onStatus: (o: Order, s: OrderStatus) => void; onVerify: (o: Order) => void; onSetPaid: (o: Order, paid: boolean) => void }> = ({ order, onClose, onStatus, onVerify, onSetPaid }) => {
   const { currency, settings } = useSettings();
   const { success, error } = useToast();
   const [tracking, setTracking] = useState('');
@@ -244,6 +254,12 @@ const OrderModal: React.FC<{ order: Order | null; onClose: () => void; onStatus:
             )}
             {payment && payment.status !== 'paid' && order.payment_method === 'bank_transfer' && (
               <Button size="sm" className="mt-3 w-full" onClick={() => onVerify(order)}><CheckCircle2 size={15} /> Verify Payment</Button>
+            )}
+            {order.payment_status !== 'paid' && order.payment_method === 'cod' && (
+              <Button size="sm" className="mt-3 w-full" onClick={() => onSetPaid(order, true)}><CheckCircle2 size={15} /> Mark as paid (cash received)</Button>
+            )}
+            {order.payment_status === 'paid' && (
+              <button type="button" onClick={() => { if (confirm('Mark this order as NOT paid?')) onSetPaid(order, false); }} className="block mt-2 text-[11px] font-bold text-ink-400 hover:text-red-500">Mark as not paid (undo)</button>
             )}
           </div>
 

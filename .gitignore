@@ -29,3 +29,6 @@ dist-ssr
 
 # local data backups
 backups/
+
+# printable staff guides (contain real business screenshots)
+guides/
