@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Banknote, TrendingUp, Receipt, Wallet, Boxes, Truck, Plus, Download, Trash2, AlertTriangle, Pencil, Paperclip } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend, PieChart, Pie, Cell } from 'recharts';
 import { InvoiceControl } from '../../components/admin/InvoiceControl';
-import { supabase, uploadInvoice, PRODUCT_COSTS_EMBED, withCosts, formatCurrency, formatDate, type Order, type Product } from '../../lib/supabase';
+import { supabase, uploadInvoice, PRODUCT_COSTS_EMBED, withCosts, formatCurrency, formatDate, type Order, type Product, type Supplier } from '../../lib/supabase';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -67,6 +67,7 @@ const AdminFinance: React.FC = () => {
   const [purchasePayments, setPurchasePayments] = useState<PurchasePayment[]>([]);
   const [refunds, setRefunds] = useState<Refund[]>([]);
   const [itemCosts, setItemCosts] = useState<ItemCost[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [suiteMissing, setSuiteMissing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [missingTable, setMissingTable] = useState(false);
@@ -77,7 +78,7 @@ const AdminFinance: React.FC = () => {
   const [saving, setSaving] = useState(false);
 
   const load = async () => {
-    const [o, p, e, pu, pt, oc, bu, rc, lk, ca, pp, rf, ic] = await Promise.all([
+    const [o, p, e, pu, pt, oc, bu, rc, lk, ca, pp, rf, ic, su] = await Promise.all([
       supabase.from('orders').select('*, items:order_items(*)').order('placed_at', { ascending: false }),
       supabase.from('products').select('id,name,stock_quantity,category_id,' + PRODUCT_COSTS_EMBED),
       supabase.from('expenses').select('*').order('expense_date', { ascending: false }),
@@ -91,7 +92,9 @@ const AdminFinance: React.FC = () => {
       supabase.from('purchase_payments').select('*').order('pay_date', { ascending: false }),
       supabase.from('order_refunds').select('*').order('refund_date', { ascending: false }),
       supabase.from('order_item_costs').select('*'),
+      supabase.from('suppliers').select('*').order('name'),
     ]);
+    setSuppliers((su.data || []) as Supplier[]);
     setPurchasePayments((pp.data || []) as PurchasePayment[]);
     setRefunds((rf.data || []) as Refund[]);
     setItemCosts((ic.data || []) as ItemCost[]);
@@ -148,6 +151,13 @@ const AdminFinance: React.FC = () => {
     const margin = revenueNet > 0 ? (net / revenueNet) * 100 : 0;
     return { valid, revenue, revenueNet, refundTotal, refundProfit, collected, outstanding, cogs, exp, expenseTotal, stockExpenseTotal, paidTotal, purchaseSpend, gross, net, inventoryValue, margin, orderCostTotal, owedSuppliers };
   }, [orders, products, expenses, purchases, orderCosts, refunds, itemCosts, range]);
+
+  // how many products each supplier provides (from the product cost records)
+  const productCounts = useMemo(() => {
+    const m: Record<string, number> = {};
+    products.forEach(p => { if (p.supplier_id) m[p.supplier_id] = (m[p.supplier_id] || 0) + 1; });
+    return m;
+  }, [products]);
 
   // Money customers paid that a partner is holding for the business (all time - balances are cumulative)
   const salesHeld = useMemo(() => {
@@ -346,7 +356,7 @@ const AdminFinance: React.FC = () => {
         </>}
 
         {tab === 'partners' && <PartnersPanel txs={txs} expenses={expenses} supplierPayments={purchasePayments} refunds={refunds} salesHeld={salesHeld} money={money} reload={load} />}
-        {tab === 'suppliers' && <SupplierPanel purchases={purchases} payments={purchasePayments} money={money} reload={load} />}
+        {tab === 'suppliers' && <SupplierPanel purchases={purchases} payments={purchasePayments} suppliers={suppliers} productCounts={productCounts} goodsExpenseTotal={f.stockExpenseTotal} money={money} reload={load} />}
         {tab === 'profit' && <ProfitPanel orders={f.valid} products={products as any} categories={categories} orderCosts={orderCosts} itemCosts={itemCosts} refunds={refunds} money={money} />}
         {tab === 'records' && <RecordsPanel locks={locks} orders={orders} products={products} expenses={expenses} txs={txs} purchases={purchases} orderCosts={orderCosts} itemCosts={itemCosts} refunds={refunds} purchasePayments={purchasePayments} reload={load} />}
       </>}

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Wallet, History, Trash2 } from 'lucide-react';
-import { supabase, formatDate, type Purchase } from '../../../lib/supabase';
+import { Link } from 'react-router-dom';
+import { Wallet, History, Trash2, Phone, Mail, MapPin, User } from 'lucide-react';
+import { supabase, formatDate, type Purchase, type Supplier } from '../../../lib/supabase';
 import { PARTNERS, type PurchasePayment } from '../../../lib/finance';
 import { useToast } from '../../../contexts/ToastContext';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -93,7 +94,10 @@ const HistoryModal: React.FC<{ purchase: PurchasePay | null; payments: PurchaseP
 };
 
 /** What you still owe suppliers, and every payment made. */
-export const SupplierPanel: React.FC<{ purchases: PurchasePay[]; payments: PurchasePayment[]; money: (n: number) => string; reload: () => void }> = ({ purchases, payments, money, reload }) => {
+export const SupplierPanel: React.FC<{
+  purchases: PurchasePay[]; payments: PurchasePayment[]; suppliers: Supplier[]; productCounts: Record<string, number>; goodsExpenseTotal: number;
+  money: (n: number) => string; reload: () => void;
+}> = ({ purchases, payments, suppliers, productCounts, goodsExpenseTotal, money, reload }) => {
   const [pay, setPay] = useState<PurchasePay | null>(null);
   const [hist, setHist] = useState<PurchasePay | null>(null);
   const [showPaid, setShowPaid] = useState(false);
@@ -104,6 +108,53 @@ export const SupplierPanel: React.FC<{ purchases: PurchasePay[]; payments: Purch
 
   return (
     <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="font-display text-xl font-extrabold text-ink-900">Your suppliers</h3>
+        <Link to="/admin/inventory" className="text-xs font-extrabold text-mint-700 hover:underline">Edit suppliers &amp; record purchases →</Link>
+      </div>
+      {suppliers.length === 0 ? (
+        <p className="rounded-4xl border border-dashed border-ink-200 bg-white p-6 text-sm text-ink-500 text-center">No suppliers yet. Add them under Inventory &amp; Suppliers.</p>
+      ) : (
+        <div className="grid md:grid-cols-2 gap-4">
+          {suppliers.map(sp => {
+            const mine = purchases.filter(p => p.supplier_id === sp.id);
+            const bought = mine.reduce((s, p) => s + Number(p.total_cost), 0);
+            const paid = mine.reduce((s, p) => s + Number(p.amount_paid || 0), 0);
+            const owed = mine.reduce((s, p) => s + owedOn(p), 0);
+            const hasContact = sp.contact_person || sp.phone || sp.email || sp.address;
+            const line = (icon: React.ReactNode, v: string | null) => v ? <p className="flex items-center gap-2 text-xs text-ink-600">{icon}<span className="break-words">{v}</span></p> : null;
+            return (
+              <div key={sp.id} className="rounded-4xl border border-ink-100 bg-white p-5 shadow-soft">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h4 className="font-display text-lg font-extrabold text-ink-900">{sp.name}</h4>
+                    <p className="text-xs font-semibold text-ink-400">{productCounts[sp.id] || 0} product(s) supplied · {mine.length} purchase(s) recorded</p>
+                  </div>
+                  {owed > 0 ? <Badge color="red">Owed {money(owed)}</Badge> : <Badge color="green">Nothing owed</Badge>}
+                </div>
+                <div className="mt-3 space-y-1">
+                  {line(<User size={13} className="text-ink-400" />, sp.contact_person)}
+                  {line(<Phone size={13} className="text-ink-400" />, sp.phone)}
+                  {line(<Mail size={13} className="text-ink-400" />, sp.email)}
+                  {line(<MapPin size={13} className="text-ink-400" />, sp.address)}
+                  {!hasContact && <p className="text-xs italic text-ink-400">No contact details yet — add them under Inventory &amp; Suppliers.</p>}
+                  {sp.notes && <p className="text-xs text-ink-500 mt-1">{sp.notes}</p>}
+                </div>
+                <dl className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+                  <div className="rounded-2xl bg-ink-50 py-2"><dt className="text-ink-400 font-semibold">Bought</dt><dd className="font-extrabold text-ink-900">{money(bought)}</dd></div>
+                  <div className="rounded-2xl bg-ink-50 py-2"><dt className="text-ink-400 font-semibold">Paid</dt><dd className="font-extrabold text-mint-700">{money(paid)}</dd></div>
+                  <div className="rounded-2xl bg-ink-50 py-2"><dt className="text-ink-400 font-semibold">Owed</dt><dd className={`font-extrabold ${owed > 0 ? 'text-red-500' : 'text-ink-900'}`}>{money(owed)}</dd></div>
+                </dl>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {goodsExpenseTotal > 0 && (
+        <div className="rounded-3xl bg-sunshine-50 border border-sunshine-200 px-4 py-3 text-xs font-semibold text-ink-700">
+          <b>{money(goodsExpenseTotal)}</b> of goods for resale was entered as <i>expenses</i> (not as purchases), so it can't be matched to a supplier here. That's fine for money already spent. New shipments recorded under Inventory → Purchases will appear in the figures above.
+        </div>
+      )}
       <div className="grid sm:grid-cols-3 gap-4">
         <div className="rounded-4xl border border-ink-100 bg-white p-5 shadow-soft sm:col-span-1">
           <p className="text-xs font-extrabold uppercase tracking-wide text-ink-400">Total owed to suppliers</p>
