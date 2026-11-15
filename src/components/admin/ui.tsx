@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
 import { Boxes, Package, ShoppingCart, Banknote, TrendingUp, AlertTriangle } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -33,10 +33,26 @@ export const StatCard: React.FC<{ label: string; value: string; icon?: React.Rea
   );
 };
 
-export const Table: React.FC<{ head: string[]; children: React.ReactNode }> = ({ head, children }) => (
+/**
+ * Admin table. On desktop it is a normal table; on a phone (see .rtable in index.css) every row becomes a card and each
+ * cell shows its column title, so nothing is hidden off the right edge and Edit / Delete buttons are always visible.
+ */
+export const Table: React.FC<{ head: string[]; children: React.ReactNode }> = ({ head, children }) => {
+  const ref = useRef<HTMLTableElement>(null);
+  useLayoutEffect(() => {
+    // tell every cell which column it belongs to (single-cell rows such as "No orders found" get no label)
+    ref.current?.querySelectorAll('tbody > tr').forEach(tr => {
+      const cells = [...tr.children];
+      cells.forEach((td, i) => {
+        const label = cells.length === 1 && head.length > 1 ? '' : (head[i] || '');
+        if (td.getAttribute('data-label') !== label) td.setAttribute('data-label', label);
+      });
+    });
+  });
+  return (
   <div className="rounded-4xl border border-ink-100 bg-white shadow-soft overflow-hidden">
     <div className="overflow-x-auto">
-      <table className="w-full text-sm min-w-[640px]">
+      <table ref={ref} className="rtable w-full text-sm min-w-[640px]">
         <thead>
           <tr className="bg-ink-50 text-left">
             {head.map((h, i) => <th key={i} className="px-4 py-3 text-xs font-extrabold uppercase tracking-wide text-ink-500">{h}</th>)}
@@ -46,7 +62,8 @@ export const Table: React.FC<{ head: string[]; children: React.ReactNode }> = ({
       </table>
     </div>
   </div>
-);
+  );
+};
 
 export const Td: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className }) => (
   <td className={cn('px-4 py-3 align-middle', className)}>{children}</td>

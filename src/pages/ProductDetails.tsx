@@ -64,7 +64,7 @@ const ProductDetails: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-4 sm:py-8 pb-28 sm:pb-8">
-      <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-sm font-bold text-ink-500 hover:text-mint-600 mb-4 sm:mb-6 transition">
+      <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 py-2 text-sm font-bold text-ink-500 hover:text-mint-600 mb-2 sm:mb-6 transition">
         <ArrowLeft size={16} /> Back
       </button>
 
