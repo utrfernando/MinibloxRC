@@ -72,7 +72,7 @@ export async function loadAttention(currency = 'LKR'): Promise<AttentionItem[]> 
   }
   if (!payRc.error) {
     const noRc = (payRc.data || []).filter((p: any) => blank(p.receipt_path));
-    push({ key: 'payment-no-receipt', level: 'medium', count: noRc.length, title: 'Supplier payments with no receipt', detail: 'Open a shipment\'s payment history and attach the payment slip.', to: '/admin/finance/suppliers', action: 'Open Suppliers' });
+    push({ key: 'payment-no-receipt', level: 'medium', count: noRc.length, title: 'Supplier payments with no receipt', detail: 'Open Inventory → Purchases: each shipment lists its payments with an Attach button for the payment slip.', to: '/admin/inventory/purchases', action: 'Open Purchases' });
   }
 
   // ---- supplier purchases ----------------------------------------------------------------------

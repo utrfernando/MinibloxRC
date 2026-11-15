@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, ArrowUpFromLine, Package, Truck } from 'lucide-react';
 import { InvoiceControl } from '../../components/admin/InvoiceControl';
-import { PARTNERS, IMPORT_CATEGORY } from '../../lib/finance';
+import { PARTNERS, IMPORT_CATEGORY, type PurchasePayment } from '../../lib/finance';
 import { PaidFromSelect } from '../../components/admin/finance/PaidFromSelect';
 import { useNavigate } from 'react-router-dom';
 import { useAdminSub } from '../../lib/adminRoute';
@@ -33,17 +33,20 @@ const AdminInventory: React.FC = () => {
   const [txns, setTxns] = useState<InventoryTransaction[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [payments, setPayments] = useState<PurchasePayment[]>([]);
   const [adjustFor, setAdjustFor] = useState<Product | null>(null);
   const [purchaseModal, setPurchaseModal] = useState(false);
   const [payFor, setPayFor] = useState<PurchasePay | null>(null);
   const [editPurchase, setEditPurchase] = useState<PurchasePay | null>(null);
   const load = async () => {
-    const [p, t, pu, s] = await Promise.all([
+    const [p, t, pu, s, pp] = await Promise.all([
       supabase.from('products').select('*, category:categories(*), ' + PRODUCT_COSTS_EMBED),
       supabase.from('inventory_transactions').select('*, product:products(id,name,sku)').order('created_at', { ascending: false }).limit(200),
       supabase.from('purchases').select('*, supplier:suppliers(*), items:purchase_items(*)').order('purchase_date', { ascending: false }),
       supabase.from('suppliers').select('*').order('name'),
+      supabase.from('purchase_payments').select('*').order('pay_date', { ascending: false }),
     ]);
+    setPayments((pp.data || []) as PurchasePayment[]);
     setProducts(withCosts(p.data) as Product[]);
     setTxns((t.data || []) as InventoryTransaction[]);
     setPurchases((pu.data || []) as Purchase[]);
@@ -144,6 +147,18 @@ const AdminInventory: React.FC = () => {
                   <InvoiceControl table="purchases" id={pu.id} path={pu.invoice_path} name={pu.invoice_name} onChanged={load} />
                   <button onClick={() => setEditPurchase(pu as PurchasePay)} className="text-xs font-extrabold text-mint-700 hover:underline">Edit invoice no. / details</button>
                 </div>
+              </div>
+              {/* every payment for this shipment, each with its own receipt */}
+              <div className="mb-3 rounded-3xl bg-ink-50 px-4 py-3">
+                <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-400 mb-1">Payments &amp; receipts</p>
+                {payments.filter(x => x.purchase_id === pu.id).length === 0
+                  ? <p className="text-xs text-ink-400">No payment recorded yet.</p>
+                  : payments.filter(x => x.purchase_id === pu.id).map(x => (
+                    <div key={x.id} className="flex flex-wrap items-center justify-between gap-2 py-1 text-xs">
+                      <span className="font-semibold text-ink-700">{formatCurrency(Number(x.amount), currency)} · {x.paid_by || 'payer not set'} · {formatDate(x.pay_date)}{x.paid_from === 'fund' ? ' · from fund' : ''}</span>
+                      <span className="flex items-center gap-1"><span className="font-bold text-ink-400">Receipt:</span><InvoiceControl table="purchase_payments" id={x.id} path={x.receipt_path} name={x.receipt_name} onChanged={load} /></span>
+                    </div>
+                  ))}
               </div>
               <div className="text-sm text-ink-600 space-y-1">
                 {pu.items?.map((it, i) => {
