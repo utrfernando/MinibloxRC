@@ -76,7 +76,7 @@ const BulkUploadModal: React.FC<{ open: boolean; onClose: () => void; onDone: ()
             <a href="/templates/miniblox-bulk-upload-template.xlsx" download><Button type="button" variant="outline" size="sm"><Download size={14} /> Download template</Button></a>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
               <Field label="Supplier invoice / order no. for this upload" hint="Saved on every product in this file that has no invoice_no column of its own">
                 <Input value={opt.invoiceNo} onChange={e => set('invoiceNo', e.target.value)} placeholder="e.g. 29909937501030126" />

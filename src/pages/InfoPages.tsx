@@ -90,7 +90,7 @@ export const Contact: React.FC = () => {
   return (
     <div>
       <PageHeader title="Contact Us" subtitle="We'd love to hear from you" />
-      <div className="max-w-6xl mx-auto px-4 py-12 grid lg:grid-cols-5 gap-8">
+      <div className="max-w-6xl mx-auto px-4 py-12 grid grid-cols-1 lg:grid-cols-5 gap-8">
         <div className="lg:col-span-2 space-y-4">
           {store.address && <InfoCard icon={<MapPin size={20} />} label="Visit / Post" value={store.address} />}
           {store.contact_email && <InfoCard icon={<Mail size={20} />} label="Email" value={store.contact_email} href={`mailto:${store.contact_email}`} />}
@@ -106,7 +106,7 @@ export const Contact: React.FC = () => {
         </div>
         <form onSubmit={submit} className="lg:col-span-3 rounded-4xl border border-ink-100 bg-white p-6 sm:p-8 shadow-soft space-y-4">
           <h2 className="font-display text-xl font-extrabold text-ink-900">Send a Message</h2>
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Name"><Input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></Field>
             <Field label="Email"><Input required type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></Field>
             <Field label="Phone" className="sm:col-span-2"><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></Field>

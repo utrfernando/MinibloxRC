@@ -92,7 +92,7 @@ export const RecurringPanel: React.FC<{ items: Recurring[]; money: (n: number) =
         </ul>
       )}
       <Modal open={open} onClose={() => setOpen(false)} title={editId ? 'Edit recurring expense' : 'New recurring expense'}>
-        <div className="grid sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Category"><Select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>{EXPENSE_CATEGORIES.map(c => <option key={c}>{c}</option>)}</Select></Field>
           <Field label="Amount"><Input type="number" min="0" step="0.01" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} /></Field>
           <Field label="Paid by"><Select value={form.paid_by} onChange={e => setForm({ ...form, paid_by: e.target.value })}><option value="">Select…</option>{PARTNERS.map(p => <option key={p}>{p}</option>)}</Select></Field>

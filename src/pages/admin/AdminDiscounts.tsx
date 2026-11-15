@@ -88,7 +88,7 @@ const AdminDiscounts: React.FC = () => {
 
       <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Edit Code' : 'New Discount Code'}>
         <div className="space-y-4">
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Code"><Input value={form.code} onChange={e => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="SUMMER20" /></Field>
             <Field label="Type">
               <Select value={form.discount_type} onChange={e => setForm({ ...form, discount_type: e.target.value })}>

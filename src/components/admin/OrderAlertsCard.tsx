@@ -101,7 +101,7 @@ export const OrderAlertsCard: React.FC = () => {
         </ol>
       </details>
 
-      <div className="grid sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Bot token"><Input type="password" autoComplete="off" value={token} onChange={e => setToken(e.target.value)} placeholder="123456789:ABC…" /></Field>
         <Field label="Chat ID"><Input value={chat} onChange={e => setChat(e.target.value)} placeholder="e.g. -1001234567890" /></Field>
       </div>

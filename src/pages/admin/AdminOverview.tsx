@@ -131,7 +131,7 @@ const AdminOverview: React.FC = () => {
         <StatCard label="Customers" value={String(customers)} icon={<Users size={20} />} tone="lavender" />
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <ChartCard title="Sales — Last 30 Days">
           <ResponsiveContainer width="100%" height={260}>
             <AreaChart data={dailySales}>
@@ -157,7 +157,7 @@ const AdminOverview: React.FC = () => {
         </ChartCard>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ChartCard title="Best-Selling Products">
           <ResponsiveContainer width="100%" height={Math.max(220, topProducts.length * 36)}>
             <BarChart data={topProducts} layout="vertical">

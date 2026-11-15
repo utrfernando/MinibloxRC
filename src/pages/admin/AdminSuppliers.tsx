@@ -68,7 +68,7 @@ const AdminSuppliers: React.FC = () => {
       {loading ? <p className="text-ink-400">Loading…</p> : suppliers.length === 0 ? (
         <p className="rounded-4xl border border-dashed border-ink-200 bg-white p-10 text-center text-ink-500">No suppliers yet. Press <b>Add Supplier</b>.</p>
       ) : (
-        <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {suppliers.map(s => {
             const t = totals[s.id] || { n: 0, bought: 0, paid: 0 };
             const owed = Math.max(0, t.bought - t.paid);

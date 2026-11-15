@@ -128,7 +128,7 @@ export const RecordsPanel: React.FC<Props> = ({ locks, orders, products, expense
 
   return (
     <div className="space-y-6">
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="rounded-4xl border border-ink-100 bg-white p-5 shadow-soft">
           <h3 className="font-display text-xl font-extrabold text-ink-900 flex items-center gap-2"><FileSpreadsheet size={18} className="text-mint-600" /> Month-close report</h3>
           <p className="text-xs text-ink-400 font-semibold mb-3">Excel file with summary, sales, expenses, partner entries and supplier purchases for one month.</p>

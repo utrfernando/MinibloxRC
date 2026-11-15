@@ -43,7 +43,7 @@ const ProductDetails: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-10 grid lg:grid-cols-2 gap-10">
+      <div className="max-w-7xl mx-auto px-4 py-10 grid grid-cols-1 lg:grid-cols-2 gap-10">
         <Skeleton className="aspect-square rounded-4xl" />
         <div className="space-y-4"><Skeleton className="h-8 w-2/3" /><Skeleton className="h-6 w-1/3" /><Skeleton className="h-24 w-full" /></div>
       </div>
@@ -68,7 +68,7 @@ const ProductDetails: React.FC = () => {
         <ArrowLeft size={16} /> Back
       </button>
 
-      <div className="grid lg:grid-cols-2 gap-6 lg:gap-10">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10">
         {/* Gallery */}
         <div>
           <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="product-image-container aspect-square rounded-3xl sm:rounded-[2rem] border border-ink-100 bg-white">

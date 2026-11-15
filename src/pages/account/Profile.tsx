@@ -50,7 +50,7 @@ const Profile: React.FC = () => {
 
       <section className="rounded-4xl border border-ink-100 bg-white p-6 sm:p-8 shadow-soft">
         <h2 className="font-display text-lg font-extrabold text-ink-900 mb-5">Personal Details</h2>
-        <form onSubmit={profileForm.handleSubmit(saveProfile)} className="grid sm:grid-cols-2 gap-4">
+        <form onSubmit={profileForm.handleSubmit(saveProfile)} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Full Name" error={profileForm.formState.errors.full_name?.message as string}><Input {...profileForm.register('full_name')} /></Field>
           <Field label="Phone"><Input {...profileForm.register('phone')} placeholder="07X XXX XXXX" /></Field>
           <Field label="Email"><Input value={user?.email || ''} disabled className="opacity-60" /></Field>
@@ -62,11 +62,11 @@ const Profile: React.FC = () => {
 
       <section className="rounded-4xl border border-ink-100 bg-white p-6 sm:p-8 shadow-soft">
         <h2 className="font-display text-lg font-extrabold text-ink-900 mb-5">Change Password</h2>
-        <form onSubmit={pwForm.handleSubmit(changePassword)} className="grid sm:grid-cols-2 gap-4 max-w-lg">
+        <form onSubmit={pwForm.handleSubmit(changePassword)} className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg">
           <Field label="New Password" error={pwForm.formState.errors.password?.message as string} className="sm:col-span-2">
             <div className="relative">
               <Input type={showPw ? 'text' : 'password'} {...pwForm.register('password')} placeholder="Min. 6 characters" className="pr-11" />
-              <button type="button" onClick={() => setShowPw(s => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400"><Eye size={17} />{showPw ? <EyeOff size={17} className="hidden" /> : null}</button>
+              <button type="button" onClick={() => setShowPw(s => !s)} aria-label="Show or hide password" className="absolute right-1 top-1/2 -translate-y-1/2 p-3 text-ink-400"><Eye size={17} />{showPw ? <EyeOff size={17} className="hidden" /> : null}</button>
             </div>
           </Field>
           <Field label="Confirm Password" error={pwForm.formState.errors.confirm?.message as string} className="sm:col-span-2"><Input type="password" {...pwForm.register('confirm')} /></Field>

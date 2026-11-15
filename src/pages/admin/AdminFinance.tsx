@@ -300,7 +300,7 @@ const AdminFinance: React.FC = () => {
 
       {loading ? <p className="text-ink-400">Loading…</p> : <>
         {tab === 'overview' && <>
-        <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
           <StatCard label="Revenue" value={money(f.revenueNet)} icon={<Banknote size={20} />} tone="mint" hint={f.refundProfit > 0 ? `${f.valid.length} orders, after ${money(f.refundProfit)} refunds` : `${f.valid.length} orders`} />
           <StatCard label="Gross profit" value={money(f.gross)} icon={<TrendingUp size={20} />} tone="lavender" hint={`Cost of goods ${money(f.cogs)}`} />
           <StatCard label="Running expenses" value={money(f.expenseTotal)} icon={<Receipt size={20} />} tone="peach" hint="Reduce profit (excludes goods for resale)" />
@@ -314,7 +314,7 @@ const AdminFinance: React.FC = () => {
           <StatCard label="Owed to suppliers" value={money(f.owedSuppliers)} icon={<Wallet size={20} />} tone={f.owedSuppliers > 0 ? 'red' : 'mint'} hint="Unpaid purchases" />
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-5 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-6">
           <div className="lg:col-span-2 rounded-4xl border border-ink-100 bg-white p-5 shadow-soft">
             <h3 className="font-display font-extrabold text-ink-900 mb-3">Revenue vs costs by month</h3>
             {monthly.length ? (
@@ -381,7 +381,7 @@ const AdminFinance: React.FC = () => {
       </>}
 
       <Modal open={formOpen} onClose={() => setFormOpen(false)} title={editId ? "Edit expense" : "Add expense"}>
-        <div className="grid sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Date"><Input type="date" value={form.expense_date} onChange={e => setForm({ ...form, expense_date: e.target.value })} /></Field>
           <Field label="Amount"><Input type="number" min="0" step="0.01" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} /></Field>
           <Field label="Category"><Select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>{EXPENSE_CATEGORIES.map(c => <option key={c}>{c}</option>)}</Select></Field>

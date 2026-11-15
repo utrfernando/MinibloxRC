@@ -86,7 +86,7 @@ const Addresses: React.FC = () => {
       {loading ? <p className="text-ink-400 font-bold">Loading…</p> : addresses.length === 0 ? (
         <EmptyState icon={<MapPin size={36} strokeWidth={1.5} />} title="No saved addresses" message="Save an address for faster checkout." actionLabel="Add Address" onAction={openNew} />
       ) : (
-        <div className="grid sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {addresses.map(a => (
             <div key={a.id} className="rounded-4xl border border-ink-100 bg-white p-5 shadow-soft relative">
               {a.is_default && <span className="absolute top-4 right-4 rounded-full bg-mint-100 text-mint-700 text-[11px] font-extrabold px-2.5 py-1">DEFAULT</span>}
@@ -104,7 +104,7 @@ const Addresses: React.FC = () => {
       )}
 
       <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Edit Address' : 'New Address'}>
-        <form onSubmit={form.handleSubmit(save)} className="grid sm:grid-cols-2 gap-4">
+        <form onSubmit={form.handleSubmit(save)} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Label (e.g. Home)" className="sm:col-span-2"><Input {...form.register('label')} placeholder="Home / Office / Other" /></Field>
           <Field label="Recipient Name" error={form.formState.errors.recipient_name?.message as string}><Input {...form.register('recipient_name')} /></Field>
           <Field label="Phone" error={form.formState.errors.phone?.message as string}><Input {...form.register('phone')} /></Field>

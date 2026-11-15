@@ -51,7 +51,7 @@ const Login: React.FC = () => {
           <Field label="Password" error={errors.password?.message}>
             <div className="relative">
               <Input type={showPw ? 'text' : 'password'} autoComplete="current-password" {...register('password')} placeholder="••••••••" className="pr-11" />
-              <button type="button" onClick={() => setShowPw(s => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-700">
+              <button type="button" onClick={() => setShowPw(s => !s)} aria-label="Show or hide password" className="absolute right-1 top-1/2 -translate-y-1/2 p-3 text-ink-400 hover:text-ink-700">
                 {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>

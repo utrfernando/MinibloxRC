@@ -148,7 +148,7 @@ const ProductForm: React.FC<Props> = ({ open, onClose, product, onSaved }) => {
 
   return (
     <Modal open={open} onClose={onClose} title={product ? 'Edit Product' : 'New Product'} wide>
-      <form onSubmit={handleSubmit(save)} className="grid md:grid-cols-2 gap-5">
+      <form onSubmit={handleSubmit(save)} className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <div className="md:col-span-2"><Field label="Product Name" error={errors.name?.message as string}><Input {...register('name')} placeholder="e.g. Mini Builder Sam — Sunset Edition" /></Field></div>
         <Field label="SKU / Item Code"><Input {...register('sku')} /></Field>
         <Field label="Category">

@@ -121,7 +121,7 @@ const AdminWebsite: React.FC = () => {
       <section className="rounded-4xl border border-ink-100 bg-white p-6 shadow-soft">
         <h2 className="font-display text-lg font-extrabold text-ink-900 mb-1 flex items-center gap-2"><Palette size={20} className="text-lavender-500" /> Branding</h2>
         <p className="text-sm text-ink-500 mb-5">Logo, colours and fonts applied across the store.</p>
-        <div className="grid sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Logo (header)">
             <div className="flex items-center gap-3">
               {branding?.logo_url && <img src={branding.logo_url} alt="" className="h-11 max-w-[120px] rounded-xl border border-ink-100 object-contain bg-white" />}

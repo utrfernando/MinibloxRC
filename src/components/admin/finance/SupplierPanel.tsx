@@ -60,7 +60,7 @@ export const PaymentModal: React.FC<{ purchase: PurchasePay | null; money: (n: n
   return (
     <Modal open onClose={onClose} title="Record supplier payment">
       <p className="text-sm text-ink-600 mb-4"><b>{purchase.supplier?.name || 'Supplier'}</b> · {purchase.reference || 'Purchase'} · total {money(Number(purchase.total_cost))}, still owed <b className="text-red-500">{money(owed)}</b></p>
-      <div className="grid sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Amount paid now"><Input type="number" min="0" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} /></Field>
         <Field label="Payment date"><Input type="date" value={date} onChange={e => setDate(e.target.value)} /></Field>
         <Field label="Done by (who made the payment)"><Select value={paidBy} onChange={e => setPaidBy(e.target.value)}><option value="">Select…</option>{PARTNERS.map(p => <option key={p}>{p}</option>)}</Select></Field>
@@ -99,7 +99,7 @@ const EditPaymentModal: React.FC<{ payment: PurchasePayment | null; onClose: () 
   };
   return (
     <Modal open onClose={onClose} title="Edit payment">
-      <div className="grid sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Amount"><Input type="number" min="0" step="0.01" value={f.amount} onChange={e => setF({ ...f, amount: e.target.value })} /></Field>
         <Field label="Date"><Input type="date" value={f.date} onChange={e => setF({ ...f, date: e.target.value })} /></Field>
         <Field label="Done by (who made the payment)"><Select value={f.paidBy} onChange={e => setF({ ...f, paidBy: e.target.value })}><option value="">Select…</option>{PARTNERS.map(p => <option key={p}>{p}</option>)}</Select></Field>
@@ -165,12 +165,12 @@ export const SupplierPanel: React.FC<{
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="font-display text-xl font-extrabold text-ink-900">Your suppliers</h3>
-        <Link to="/admin/suppliers" className="text-xs font-extrabold text-mint-700 hover:underline">Manage suppliers →</Link>
+        <Link to="/admin/suppliers" className="py-2 text-xs font-extrabold text-mint-700 hover:underline">Manage suppliers →</Link>
       </div>
       {suppliers.length === 0 ? (
         <p className="rounded-4xl border border-dashed border-ink-200 bg-white p-6 text-sm text-ink-500 text-center">No suppliers yet. Add them under Inventory &amp; Suppliers.</p>
       ) : (
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {suppliers.map(sp => {
             const mine = purchases.filter(p => p.supplier_id === sp.id);
             const bought = mine.reduce((s, p) => s + Number(p.total_cost), 0);
@@ -187,7 +187,7 @@ export const SupplierPanel: React.FC<{
                   </div>
                   {owed > 0 ? <Badge color="red">Owed {money(owed)}</Badge> : <Badge color="green">Nothing owed</Badge>}
                 </div>
-                <Link to={`/admin/suppliers/${sp.id}`} className="mt-1 inline-block text-xs font-extrabold text-mint-700 hover:underline">Edit supplier details →</Link>
+                <Link to={`/admin/suppliers/${sp.id}`} className="mt-1 inline-block py-2 text-xs font-extrabold text-mint-700 hover:underline">Edit supplier details →</Link>
                 <div className="mt-3 space-y-1">
                   {line(<User size={13} className="text-ink-400" />, sp.contact_person)}
                   {line(<Phone size={13} className="text-ink-400" />, sp.phone)}
@@ -211,7 +211,7 @@ export const SupplierPanel: React.FC<{
           <b>{money(goodsExpenseTotal)}</b> of goods for resale was entered as <i>expenses</i> (not as purchases), so it can't be matched to a supplier here. That's fine for money already spent. New shipments recorded under Inventory → Purchases will appear in the figures above.
         </div>
       )}
-      <div className="grid sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="rounded-4xl border border-ink-100 bg-white p-5 shadow-soft sm:col-span-1">
           <p className="text-xs font-extrabold uppercase tracking-wide text-ink-400">Total owed to suppliers</p>
           <p className={`font-display text-3xl font-extrabold mt-2 ${totalOwed > 0 ? 'text-red-500' : 'text-mint-700'}`}>{money(totalOwed)}</p>

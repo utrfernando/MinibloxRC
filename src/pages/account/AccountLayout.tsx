@@ -49,7 +49,7 @@ const AccountLayout: React.FC = () => {
         </div>
       )}
 
-      <div className="grid lg:grid-cols-[240px_1fr] gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-8">
         <aside className="hidden lg:block">
           <div className="sticky top-28 rounded-4xl border border-ink-100 bg-white p-4 shadow-soft">
             <div className="flex items-center gap-3 px-2 pb-4 mb-3 border-b border-ink-100">

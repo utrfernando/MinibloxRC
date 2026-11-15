@@ -77,7 +77,7 @@ const Hero: React.FC<{ banners: Banner[] }> = ({ banners }) => {
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-mint-400 via-mint-300 to-sunshine-200">
       <div className="absolute inset-0 bg-dots opacity-30" />
-      <div className="max-w-7xl mx-auto px-4 py-16 sm:py-24 grid lg:grid-cols-2 gap-10 items-center relative">
+      <div className="max-w-7xl mx-auto px-4 py-16 sm:py-24 grid grid-cols-1 lg:grid-cols-2 gap-10 items-center relative">
         <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6 }}>
           <span className="inline-block rounded-full bg-white/30 backdrop-blur px-4 py-1.5 text-sm font-bold text-ink-900 mb-5">{tagline}</span>
           <h1 className="font-display text-5xl sm:text-6xl font-extrabold text-ink-900 leading-[1.05] mb-5">
@@ -252,7 +252,7 @@ const Home: React.FC = () => {
       {secVisible('testimonials') && (
         <section className="max-w-7xl mx-auto px-4 py-14">
           <h2 className="font-display text-3xl sm:text-4xl font-extrabold text-ink-900 text-center mb-10">What Our Customers Say</h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {TESTIMONIALS.map((t, i) => (
               <motion.div key={i} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.07 }} className="rounded-4xl border border-ink-100 bg-white p-6 shadow-soft">
                 <Quote size={26} className="text-sunshine-400 mb-3" fill="currentColor" />

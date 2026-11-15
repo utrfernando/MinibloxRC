@@ -42,7 +42,7 @@ export const SupplierFormModal: React.FC<{ open: boolean; supplier: Supplier | n
     <Modal open={open} onClose={onClose} title={supplier ? 'Edit supplier' : 'Add supplier'}>
       <div className="space-y-4">
         <Field label="Company / seller name"><Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></Field>
-        <div className="grid sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Contact person"><Input value={form.contact_person} onChange={e => setForm({ ...form, contact_person: e.target.value })} /></Field>
           <Field label="Phone / WhatsApp"><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+86 …" /></Field>
         </div>

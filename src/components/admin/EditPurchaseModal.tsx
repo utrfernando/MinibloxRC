@@ -40,7 +40,7 @@ export const EditPurchaseModal: React.FC<{ purchase: EditablePurchase | null; su
 
   return (
     <Modal open onClose={onClose} title="Edit shipment">
-      <div className="grid sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="sm:col-span-2"><Field label="Invoice / order no." hint="Also applied to this shipment's payments that had no number"><Input value={reference} onChange={e => setReference(e.target.value)} placeholder="e.g. 29909937501030126" /></Field></div>
         <Field label="Supplier"><Select value={supplierId} onChange={e => setSupplierId(e.target.value)}><option value="">—</option>{suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</Select></Field>
         <Field label="Purchase date"><Input type="date" value={date} onChange={e => setDate(e.target.value)} /></Field>

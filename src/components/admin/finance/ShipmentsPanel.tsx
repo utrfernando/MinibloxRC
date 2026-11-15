@@ -85,7 +85,7 @@ export const ShipmentsPanel: React.FC<{
 
   return (
     <div className="space-y-5">
-      <div className="grid sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[['Spent on shipments', totals.cost, 'text-ink-900'], ['Earned from them so far', totals.revenue, 'text-mint-700'], ['Profit so far (sold items)', totals.profit, totals.profit >= 0 ? 'text-mint-700' : 'text-red-500']].map(([l, v, c]) => (
           <div key={l as string} className="rounded-4xl border border-ink-100 bg-white p-5 shadow-soft">
             <p className="text-xs font-extrabold uppercase tracking-wide text-ink-400">{l as string}</p>

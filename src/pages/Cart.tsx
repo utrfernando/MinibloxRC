@@ -79,7 +79,7 @@ const Cart: React.FC = () => {
     <div className="max-w-7xl mx-auto px-4 py-10">
       <h1 className="font-display text-3xl sm:text-4xl font-extrabold text-ink-900 mb-8">Your Cart <span className="text-mint-500">({items.reduce((s, i) => s + i.quantity, 0)})</span></h1>
 
-      <div className="grid lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Items */}
         <div className="lg:col-span-2 space-y-4">
           {items.map(({ product, quantity }) => {

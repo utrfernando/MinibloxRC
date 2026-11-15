@@ -123,7 +123,7 @@ export const PartnersPanel: React.FC<Props> = ({ txs, expenses, supplierPayments
         <p className="mt-2 text-xs font-semibold text-ink-500">{fund.balance < 0 ? 'The fund has paid out more than was deposited — add a deposit below (or mark those payments as "Own pocket").' : 'How it works: a partner deposits money here (Add entry → Put money in). Expenses, supplier payments and refunds are then paid from the fund. The partner who makes each payment is recorded, but it is not counted as their own money.'}</p>
       </div>
 
-      <div className="grid sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {stats.map(s => (
           <div key={s.p} className="rounded-4xl border border-ink-100 bg-white p-5 shadow-soft">
             <div className="flex items-center justify-between mb-3">
@@ -172,7 +172,7 @@ export const PartnersPanel: React.FC<Props> = ({ txs, expenses, supplierPayments
       </Table>
 
       <Modal open={open} onClose={() => setOpen(false)} title={editId ? 'Edit partner entry' : 'Add partner entry'}>
-        <div className="grid sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Date"><Input type="date" value={form.tx_date} onChange={e => setForm({ ...form, tx_date: e.target.value })} /></Field>
           <Field label="Amount"><Input type="number" min="0" step="0.01" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} /></Field>
           <Field label="Partner"><Select value={form.partner} onChange={e => setForm({ ...form, partner: e.target.value })}><option value="">Select…</option>{PARTNERS.map(p => <option key={p}>{p}</option>)}</Select></Field>

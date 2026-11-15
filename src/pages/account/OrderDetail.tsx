@@ -66,7 +66,7 @@ const OrderDetail: React.FC = () => {
         </div>
       )}
 
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           {/* Items */}
           <section className="rounded-4xl border border-ink-100 bg-white p-6 shadow-soft">

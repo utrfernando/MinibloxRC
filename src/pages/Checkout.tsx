@@ -134,12 +134,12 @@ const Checkout: React.FC = () => {
     <div className="max-w-6xl mx-auto px-4 py-10">
       <h1 className="font-display text-3xl sm:text-4xl font-extrabold text-ink-900 mb-8">Checkout</h1>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="grid lg:grid-cols-3 gap-8">
+      <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
           {/* Contact & delivery */}
           <section className="rounded-4xl border border-ink-100 bg-white p-6 sm:p-8 shadow-soft">
             <h2 className="font-display text-xl font-extrabold text-ink-900 mb-5">Delivery Details</h2>
-            <div className="grid sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Full Name" error={errors.customer_name?.message}><Input {...register('customer_name')} /></Field>
               <Field label="Phone Number" error={errors.phone?.message}><Input {...register('phone')} placeholder="07X XXX XXXX" /></Field>
               <Field label="Email" error={errors.email?.message} className="sm:col-span-2"><Input type="email" {...register('email')} /></Field>
@@ -156,7 +156,7 @@ const Checkout: React.FC = () => {
           {/* Payment */}
           <section className="rounded-4xl border border-ink-100 bg-white p-6 sm:p-8 shadow-soft">
             <h2 className="font-display text-xl font-extrabold text-ink-900 mb-5">Payment Method</h2>
-            <div className="grid sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <button type="button" onClick={() => setPaymentMethod('cod')}
                 className={cn('rounded-3xl border-2 p-5 text-left transition', paymentMethod === 'cod' ? 'border-mint-500 bg-mint-50' : 'border-ink-100 hover:border-mint-200')}>
                 <Banknote size={28} className="text-mint-600 mb-2" />
@@ -174,7 +174,7 @@ const Checkout: React.FC = () => {
             {paymentMethod === 'bank_transfer' && (
               <div className="mt-5 rounded-3xl bg-cream-100 border border-cream-300 p-5">
                 <h3 className="font-bold text-ink-900 mb-3">Bank Details</h3>
-                <div className="grid sm:grid-cols-2 gap-2 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                   {bank.bank_name && <p><span className="text-ink-500">Bank:</span> <span className="font-bold">{bank.bank_name}</span></p>}
                   {bank.account_name && <p><span className="text-ink-500">Name:</span> <span className="font-bold">{bank.account_name}</span></p>}
                   {bank.account_number && <p><span className="text-ink-500">Account:</span> <span className="font-mono font-bold">{bank.account_number}</span></p>}

@@ -94,7 +94,7 @@ const AdminInventory: React.FC = () => {
             <StatCard label="Units Sold" value={String(stats.sold)} icon={<ArrowUpFromLine size={20} />} tone="lavender" />
             <StatCard label="Stock Value (landed)" value={formatCurrency(stats.stockValue, currency)} icon={<Truck size={20} />} tone="ink" />
           </div>
-          <div className="grid lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <StockList title={`Low Stock (${stats.low.length})`} products={stats.low} onAdjust={setAdjustFor} warn />
             <StockList title={`Out of Stock (${stats.out.length})`} products={stats.out} onAdjust={setAdjustFor} />
           </div>
@@ -330,45 +330,45 @@ const PurchaseModal: React.FC<{ open: boolean; onClose: () => void; products: Pr
   return (
     <Modal open={open} onClose={onClose} title="Record Purchase" wide>
       <div className="space-y-4">
-        <div className="grid sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Field label="Invoice / order no. *" hint="From the supplier invoice or Alibaba order"><Input value={reference} onChange={e => setReference(e.target.value)} placeholder="e.g. 29909937501030126" /></Field>
           <Field label="Supplier">
             <Select value={supplierId} onChange={e => setSupplierId(e.target.value)}><option value="">—</option>{suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</Select>
           </Field>
           <Field label="Date"><Input type="date" value={date} onChange={e => setDate(e.target.value)} /></Field>
         </div>
-        <div className="space-y-2 overflow-x-auto"><div className="min-w-[440px] space-y-2">
-          <div className="grid grid-cols-[1fr_90px_110px_36px] gap-2 text-xs font-extrabold uppercase text-ink-400 px-1">
+        <div className="space-y-2 sm:overflow-x-auto"><div className="sm:min-w-[440px] space-y-3 sm:space-y-2">
+          <div className="hidden sm:grid grid-cols-[1fr_90px_110px_36px] gap-2 text-xs font-extrabold uppercase text-ink-400 px-1">
             <span>Product</span><span>Qty</span><span>Unit Cost</span><span />
           </div>
           {rows.map((r, i) => (
-            <div key={i} className="grid grid-cols-[1fr_90px_110px_36px] gap-2">
-              <Select value={r.product_id} onChange={e => setRows(rows.map((x, j) => j === i ? { ...x, product_id: e.target.value } : x))}>
+            <div key={i} className="grid grid-cols-2 sm:grid-cols-[1fr_90px_110px_36px] gap-2 rounded-2xl bg-ink-50/60 p-2 sm:bg-transparent sm:p-0">
+              <Select className="col-span-2 sm:col-span-1" aria-label="Product" value={r.product_id} onChange={e => setRows(rows.map((x, j) => j === i ? { ...x, product_id: e.target.value } : x))}>
                 <option value="">Select…</option>
                 {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </Select>
-              <Input type="number" min={1} value={r.quantity} onChange={e => setRows(rows.map((x, j) => j === i ? { ...x, quantity: Number(e.target.value) } : x))} />
-              <Input type="number" step="0.01" value={r.unit_cost} onChange={e => setRows(rows.map((x, j) => j === i ? { ...x, unit_cost: Number(e.target.value) } : x))} />
-              <button onClick={() => setRows(rows.filter((_, j) => j !== i))} className="p-2 text-red-400 hover:text-red-600"><TrashIcon /></button>
+              <Input type="number" min={1} placeholder="Qty" aria-label="Quantity" value={r.quantity} onChange={e => setRows(rows.map((x, j) => j === i ? { ...x, quantity: Number(e.target.value) } : x))} />
+              <Input type="number" step="0.01" placeholder="Unit cost" aria-label="Unit cost" value={r.unit_cost} onChange={e => setRows(rows.map((x, j) => j === i ? { ...x, unit_cost: Number(e.target.value) } : x))} />
+              <button onClick={() => setRows(rows.filter((_, j) => j !== i))} aria-label="Remove row" className="col-span-2 sm:col-span-1 justify-self-end p-2 text-red-400 hover:text-red-600"><TrashIcon /></button>
             </div>
           ))}
           <Button variant="secondary" size="sm" onClick={() => setRows([...rows, { product_id: '', quantity: 1, unit_cost: 0 }])}><Plus size={14} /> Add Row</Button>
         </div></div>
-        <div className="grid sm:grid-cols-3 gap-4 rounded-3xl bg-cream-100 p-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 rounded-3xl bg-cream-100 p-4">
           <Field label="Paid to supplier now" hint="Leave empty if unpaid"><Input type="number" min="0" step="0.01" value={paidNow} onChange={e => setPaidNow(e.target.value)} placeholder="0.00" /></Field>
           <Field label="Done by (who paid)"><Select value={paidBy} onChange={e => setPaidBy(e.target.value)}><option value="">Select…</option>{PARTNERS.map(p => <option key={p}>{p}</option>)}</Select></Field>
           <PaidFromSelect value={payFrom} onChange={setPayFrom} label="Paid from (supplier + freight)" />
           <Field label="Method"><Select value={payMethod} onChange={e => setPayMethod(e.target.value)}><option value="bank">Bank transfer</option><option value="cash">Cash</option><option value="card">Card</option><option value="other">Other</option></Select></Field>
         </div>
-        <div className="grid sm:grid-cols-3 gap-4 rounded-3xl bg-cream-100 p-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 rounded-3xl bg-cream-100 p-4">
           <Field label="Freight + customs for this shipment" hint="Spread into each product's cost price"><Input type="number" min="0" step="0.01" value={importCost} onChange={e => setImportCost(e.target.value)} placeholder="0.00" /></Field>
           <Field label="Freight done by"><Select value={importPaidBy} onChange={e => setImportPaidBy(e.target.value)}><option value="">Select…</option>{PARTNERS.map(p => <option key={p}>{p}</option>)}</Select></Field>
           <p className="text-xs font-semibold text-ink-500 self-end pb-2">Saved as an "{IMPORT_CATEGORY}" expense for the partner, and added to landed cost — so it is not counted twice in profit.</p>
         </div>
         <Field label="Notes"><Textarea value={notes} onChange={e => setNotes(e.target.value)} className="min-h-[60px]" /></Field>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="font-extrabold text-ink-900">Goods: {formatCurrency(total, 'LKR')}{extra > 0 && <span className="ml-2 text-xs font-bold text-ink-500">+ {formatCurrency(extra, 'LKR')} freight = {formatCurrency(total + extra, 'LKR')} landed</span>}</p>
-          <div className="flex gap-2"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button onClick={save} loading={saving}>Save Purchase</Button></div>
+          <div className="flex justify-end gap-2"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button onClick={save} loading={saving}>Save Purchase</Button></div>
         </div>
       </div>
     </Modal>

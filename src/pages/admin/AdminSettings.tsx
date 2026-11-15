@@ -93,7 +93,7 @@ const AdminSettings: React.FC = () => {
         <section className="rounded-4xl border border-ink-100 bg-white p-6 shadow-soft">
           <h2 className="font-display text-lg font-extrabold text-ink-900 mb-1">Store details</h2>
           <p className="text-sm text-ink-500 mb-4">Shown on the shop, invoices and the chat helper.</p>
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Store Name"><Input value={store.store_name || ''} onChange={e => setStore({ ...store, store_name: e.target.value })} /></Field>
             <Field label="Tagline"><Input value={store.tagline || ''} onChange={e => setStore({ ...store, tagline: e.target.value })} /></Field>
             <Field label="Currency Code"><Input value={store.currency || 'LKR'} onChange={e => setStore({ ...store, currency: e.target.value })} className="!w-32" /></Field>
@@ -116,7 +116,7 @@ const AdminSettings: React.FC = () => {
         <section className="rounded-4xl border border-ink-100 bg-white p-6 shadow-soft">
           <h2 className="font-display text-lg font-extrabold text-ink-900 mb-1">Bank transfer details</h2>
           <p className="text-sm text-ink-500 mb-4">Shown to customers who choose bank transfer at checkout.</p>
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Bank Name"><Input value={bank.bank_name || ''} onChange={e => setBank({ ...bank, bank_name: e.target.value })} /></Field>
             <Field label="Account Name"><Input value={bank.account_name || ''} onChange={e => setBank({ ...bank, account_name: e.target.value })} /></Field>
             <Field label="Account Number"><Input value={bank.account_number || ''} onChange={e => setBank({ ...bank, account_number: e.target.value })} /></Field>

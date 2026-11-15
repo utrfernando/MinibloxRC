@@ -238,7 +238,7 @@ const OrderModal: React.FC<{ order: Order | null; onClose: () => void; onStatus:
 
   return (
     <Modal open={!!order} onClose={onClose} title={`Order ${order.order_number}`} wide>
-      <div className="grid md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2 space-y-5">
           <div>
             <p className="text-xs font-extrabold uppercase text-ink-400 mb-2">Items</p>

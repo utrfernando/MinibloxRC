@@ -112,7 +112,7 @@ const AdminPromotions: React.FC = () => {
             </div>
             <Input className="mt-2" value={form.image_url} onChange={e => setForm({ ...form, image_url: e.target.value })} placeholder="…or paste image URL" />
           </div>
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Button Label"><Input value={form.cta_label} onChange={e => setForm({ ...form, cta_label: e.target.value })} placeholder="Shop Now" /></Field>
             <Field label="Button Link"><Input value={form.cta_link} onChange={e => setForm({ ...form, cta_link: e.target.value })} placeholder="/shop or /shop?filter=new" /></Field>
             <Field label="Placement">
