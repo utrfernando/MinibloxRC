@@ -56,6 +56,7 @@ export type Product = {
   supplier_id: string | null;
   supplier_cost: number;
   landed_cost: number;
+  invoice_no?: string | null;
   selling_price: number;
   discount_price: number | null;
   stock_quantity: number;
@@ -333,6 +334,7 @@ export function withCosts<T extends Record<string, any>>(rows: T[] | null | unde
       supplier_id: c?.supplier_id ?? null,
       supplier_cost: Number(c?.supplier_cost ?? 0),
       landed_cost: Number(c?.landed_cost ?? 0),
+      invoice_no: c?.invoice_no ?? null,
     };
   });
 }

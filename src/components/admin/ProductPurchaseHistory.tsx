@@ -13,10 +13,12 @@ type Row = {
 export const ProductPurchaseHistory: React.FC<{ productId: string; currency: string }> = ({ productId, currency }) => {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [productInvoice, setProductInvoice] = useState<string | null>(null);
   const money = (n: number) => formatCurrency(n, currency);
 
   useEffect(() => {
-    setRows(null); setFailed(false);
+    setRows(null); setFailed(false); setProductInvoice(null);
+    supabase.from('product_costs').select('invoice_no').eq('product_id', productId).maybeSingle().then(({ data }) => setProductInvoice((data as any)?.invoice_no || null));
     supabase.from('purchase_items')
       .select('quantity,unit_cost,purchase:purchases(id,reference,purchase_date,total_cost,extra_costs,supplier:suppliers(name),items:purchase_items(quantity,unit_cost))')
       .eq('product_id', productId)
@@ -31,6 +33,7 @@ export const ProductPurchaseHistory: React.FC<{ productId: string; currency: str
     <div className="rounded-3xl bg-lavender-50 p-4">
       <p className="text-xs font-extrabold uppercase tracking-wide text-lavender-600 mb-1">Purchase history</p>
       <p className="text-[11px] text-ink-500 mb-3">Where this product came from. Filled in automatically when you record stock under Inventory → Purchases — nothing to type here.</p>
+      {productInvoice && <p className="text-xs font-bold text-ink-800 mb-2">Invoice / order no. on this product: <span className="font-extrabold">{productInvoice}</span></p>}
       {rows === null ? <p className="text-xs text-ink-400">Loading…</p>
         : failed ? <p className="text-xs text-red-500 font-semibold">Couldn't load the purchase history.</p>
         : rows.length === 0 ? <p className="text-xs text-ink-500 italic">No purchases recorded for this product yet — its stock was loaded as opening stock (bulk upload).</p>

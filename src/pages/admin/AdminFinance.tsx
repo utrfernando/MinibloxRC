@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Banknote, TrendingUp, Receipt, Wallet, Boxes, Truck, Plus, Download, Trash2, AlertTriangle, Pencil, Paperclip } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend, PieChart, Pie, Cell } from 'recharts';
 import { InvoiceControl } from '../../components/admin/InvoiceControl';
@@ -58,7 +59,10 @@ const AdminFinance: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [purchases, setPurchases] = useState<PurchasePay[]>([]);
-  const [tab, setTab] = useState<Tab>('overview');
+  const [params] = useSearchParams();
+  const [tab, setTab] = useState<Tab>(() => (TABS.some(t => t.k === params.get('tab')) ? (params.get('tab') as Tab) : 'overview'));
+  // opened from a link (e.g. the alert bell) while already on this page
+  useEffect(() => { const t = params.get('tab'); if (t && TABS.some(x => x.k === t)) setTab(t as Tab); }, [params]);
   const [txs, setTxs] = useState<PartnerTx[]>([]);
   const [orderCosts, setOrderCosts] = useState<OrderCost[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
@@ -358,7 +362,7 @@ const AdminFinance: React.FC = () => {
 
         {tab === 'partners' && <PartnersPanel txs={txs} expenses={expenses} supplierPayments={purchasePayments} refunds={refunds} salesHeld={salesHeld} money={money} reload={load} />}
         {tab === 'suppliers' && <SupplierPanel purchases={purchases} payments={purchasePayments} suppliers={suppliers} productCounts={productCounts} goodsExpenseTotal={f.stockExpenseTotal} money={money} reload={load} />}
-        {tab === 'shipments' && <ShipmentsPanel purchases={purchases as any} orders={orders} products={products} money={money} />}
+        {tab === 'shipments' && <ShipmentsPanel purchases={purchases as any} orders={orders} products={products} suppliers={suppliers} money={money} reload={load} />}
         {tab === 'profit' && <ProfitPanel orders={f.valid} products={products as any} categories={categories} orderCosts={orderCosts} itemCosts={itemCosts} refunds={refunds} money={money} />}
         {tab === 'records' && <RecordsPanel locks={locks} orders={orders} products={products} expenses={expenses} txs={txs} purchases={purchases} orderCosts={orderCosts} itemCosts={itemCosts} refunds={refunds} purchasePayments={purchasePayments} reload={load} />}
       </>}

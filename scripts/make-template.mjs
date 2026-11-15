@@ -1,9 +1,9 @@
 import * as XLSX from 'xlsx';
-const headers = ['sku','name','description','category','supplier','supplier_cost_usd','supplier_cost','landed_cost','selling_price','discount_price','stock_quantity','low_stock_threshold','status','is_featured','is_best_seller','is_new','tags','image_urls'];
+const headers = ['sku','name','description','category','supplier','invoice_no','supplier_cost_usd','supplier_cost','landed_cost','selling_price','discount_price','stock_quantity','low_stock_threshold','status','is_featured','is_best_seller','is_new','tags','image_urls'];
 const rows = [
-  ['M3038','Mini Block Ornament M3038','Collectible mini building-block ornament','Building Blocks','Shantou Chenghai Cayi Toy Co., Ltd',0.30,'','','','',10,5,'draft','no','no','yes','ornament, mini blocks','https://example.com/images/m3038.jpg'],
-  ['M3040','Mini Block Ornament M3040','Collectible mini building-block ornament','Building Blocks','Shantou Chenghai Cayi Toy Co., Ltd',0.30,'','','','',45,5,'draft','no','no','yes','ornament, mini blocks',''],
-  ['MZ-495','Flower Plant Block Set MZ-495','Build-it-yourself flower plant set','Flower Collections','Shantou Chenghai Cayi Toy Co., Ltd',0.50,'','','','',28,5,'draft','no','no','yes','flower, plant','https://example.com/images/mz495.jpg | https://example.com/images/mz495-2.jpg'],
+  ['M3038','Mini Block Ornament M3038','Collectible mini building-block ornament','Building Blocks','Shantou Chenghai Cayi Toy Co., Ltd','INV-2026-001',0.30,'','','','',10,5,'draft','no','no','yes','ornament, mini blocks','https://example.com/images/m3038.jpg'],
+  ['M3040','Mini Block Ornament M3040','Collectible mini building-block ornament','Building Blocks','Shantou Chenghai Cayi Toy Co., Ltd','INV-2026-001',0.30,'','','','',45,5,'draft','no','no','yes','ornament, mini blocks',''],
+  ['MZ-495','Flower Plant Block Set MZ-495','Build-it-yourself flower plant set','Flower Collections','Shantou Chenghai Cayi Toy Co., Ltd','INV-2026-001',0.50,'','','','',28,5,'draft','no','no','yes','flower, plant','https://example.com/images/mz495.jpg | https://example.com/images/mz495-2.jpg'],
 ];
 const guide = [
  ['Column','Required?','What to enter'],
@@ -12,6 +12,7 @@ const guide = [
  ['description','No','Short product description.'],
  ['category','No','Category name. Created automatically if new (when the option is ticked).'],
  ['supplier','No','Supplier name. Created automatically if new.'],
+ ['invoice_no','No','Supplier invoice / order number the stock was bought on. Shown on the product (admin only).'],
  ['supplier_cost_usd','One of','Unit cost in US$. Converted using the exchange rate you type in the upload dialog.'],
  ['supplier_cost','One of','Unit cost already in your store currency (overrides supplier_cost_usd).'],
  ['landed_cost','No','Cost incl. shipping/duty in store currency. Blank = same as supplier cost.'],

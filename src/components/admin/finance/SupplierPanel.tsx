@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { EditPurchaseModal } from '../EditPurchaseModal';
 import { Wallet, History, Trash2, Phone, Mail, MapPin, User } from 'lucide-react';
 import { supabase, formatDate, type Purchase, type Supplier } from '../../../lib/supabase';
 import { PARTNERS, type PurchasePayment } from '../../../lib/finance';
@@ -100,6 +101,7 @@ export const SupplierPanel: React.FC<{
 }> = ({ purchases, payments, suppliers, productCounts, goodsExpenseTotal, money, reload }) => {
   const [pay, setPay] = useState<PurchasePay | null>(null);
   const [hist, setHist] = useState<PurchasePay | null>(null);
+  const [edit, setEdit] = useState<PurchasePay | null>(null);
   const [showPaid, setShowPaid] = useState(false);
   const totalOwed = purchases.reduce((s, p) => s + owedOn(p), 0);
   const bySupplier = new Map<string, number>();
@@ -179,7 +181,7 @@ export const SupplierPanel: React.FC<{
           <tr key={p.id} className="hover:bg-ink-50/50">
             <Td className="text-xs text-ink-500">{formatDate(p.purchase_date)}</Td>
             <Td className="font-bold text-ink-800">{p.supplier?.name || '—'}</Td>
-            <Td className="text-ink-600">{p.reference || '—'}</Td>
+            <Td className="text-ink-600">{p.reference || <button onClick={() => setEdit(p)} className="text-xs font-bold text-red-500 hover:underline">add invoice no.</button>}{p.reference && <button onClick={() => setEdit(p)} className="ml-1 text-[11px] text-ink-400 hover:text-mint-700" aria-label="Edit invoice no.">✎</button>}</Td>
             <Td>{money(Number(p.total_cost))}{Number(p.extra_costs) > 0 && <span className="block text-[11px] text-ink-400">+ {money(Number(p.extra_costs))} freight/customs</span>}</Td>
             <Td>{money(Number(p.amount_paid || 0))}{p.last_paid_date && <span className="block text-[11px] text-ink-400">{formatDate(p.last_paid_date)}</span>}</Td>
             <Td className="font-bold text-red-500">{money(owedOn(p))}</Td>
@@ -193,6 +195,7 @@ export const SupplierPanel: React.FC<{
           </tr>
         ))}
       </Table>
+      <EditPurchaseModal purchase={edit} suppliers={suppliers} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); reload(); }} />
       <PaymentModal purchase={pay} money={money} onClose={() => setPay(null)} onSaved={() => { setPay(null); reload(); }} />
       <HistoryModal purchase={hist ? purchases.find(p => p.id === hist.id) || hist : null} payments={payments} money={money} onClose={() => setHist(null)} onChanged={reload} />
     </div>

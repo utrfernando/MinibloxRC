@@ -4,7 +4,7 @@ import { slugify, generateSku } from './utils';
 
 /** Canonical columns in the official template. */
 export const TEMPLATE_COLUMNS = [
-  'sku', 'name', 'description', 'category', 'supplier',
+  'sku', 'name', 'description', 'category', 'supplier', 'invoice_no',
   'supplier_cost_usd', 'supplier_cost', 'landed_cost', 'selling_price', 'discount_price',
   'stock_quantity', 'low_stock_threshold', 'status',
   'is_featured', 'is_best_seller', 'is_new', 'tags', 'image_urls',
@@ -13,6 +13,7 @@ type Col = typeof TEMPLATE_COLUMNS[number];
 
 /** Header aliases (normalised: lowercase, letters/digits only). Lets supplier invoices upload as-is. */
 const ALIASES: Record<string, Col> = {
+  invoiceno: 'invoice_no', invoicenumber: 'invoice_no', invoice: 'invoice_no', orderno: 'invoice_no', ordernumber: 'invoice_no', purchaseinvoice: 'invoice_no',
   sku: 'sku', itemno: 'sku', itemnumber: 'sku', itemcode: 'sku', code: 'sku', modelno: 'sku',
   name: 'name', productname: 'name', title: 'name',
   description: 'description', descriptionofproduct: 'description', desc: 'description', details: 'description',
@@ -51,6 +52,7 @@ export type ParsedRow = {
   description: string;
   category: string;
   supplier: string;
+  invoice_no: string;
   supplier_cost: number;
   landed_cost: number;
   selling_price: number;
@@ -138,6 +140,7 @@ export function parseRows(grid: unknown[][], opt: ImportOptions): { rows: Parsed
       description: nameRaw ? desc : '',
       category: text(o.category),
       supplier: text(o.supplier),
+      invoice_no: text(o.invoice_no),
       supplier_cost: supplier_cost || 0,
       landed_cost: Math.round(landed * 100) / 100,
       selling_price: selling ?? 0,
@@ -207,6 +210,7 @@ export async function runImport(rows: ParsedRow[], opt: ImportOptions, onProgres
     product_id,
     supplier_id: r.supplier ? supMap.get(r.supplier.toLowerCase()) ?? null : null,
     supplier_cost: r.supplier_cost, landed_cost: r.landed_cost,
+    ...(r.invoice_no ? { invoice_no: r.invoice_no } : {}),
   });
 
   const toCreate: ParsedRow[] = [];

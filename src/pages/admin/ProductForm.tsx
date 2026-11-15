@@ -23,6 +23,7 @@ const schema = z.object({
   supplier_id: z.string().optional(),
   supplier_cost: z.coerce.number().min(0),
   landed_cost: z.coerce.number().min(0),
+  invoice_no: z.string().optional(),
   selling_price: z.coerce.number().min(0, 'Price required'),
   discount_price: z.coerce.number().min(0).optional().or(z.literal('')),
   stock_quantity: z.coerce.number().int().min(0),
@@ -64,7 +65,7 @@ const ProductForm: React.FC<Props> = ({ open, onClose, product, onSaved }) => {
       reset({
         name: product.name, sku: product.sku || '', description: product.description || '',
         category_id: product.category_id || '', supplier_id: product.supplier_id || '',
-        supplier_cost: Number(product.supplier_cost), landed_cost: Number(product.landed_cost),
+        supplier_cost: Number(product.supplier_cost), landed_cost: Number(product.landed_cost), invoice_no: product.invoice_no || '',
         selling_price: Number(product.selling_price), discount_price: product.discount_price ? Number(product.discount_price) : '',
         stock_quantity: product.stock_quantity, low_stock_threshold: product.low_stock_threshold,
         status: product.status, is_featured: product.is_featured, is_best_seller: product.is_best_seller,
@@ -113,6 +114,8 @@ const ProductForm: React.FC<Props> = ({ open, onClose, product, onSaved }) => {
       supplier_id: data.supplier_id || null,
       supplier_cost: Number(data.supplier_cost) || 0,
       landed_cost: Number(data.landed_cost) || 0,
+      // only sent when used, so saving works even before the invoice-number column exists
+      ...((data.invoice_no || '').trim() || product?.invoice_no ? { invoice_no: (data.invoice_no || '').trim() || null } : {}),
     };
 
     let productId = product?.id;
@@ -165,6 +168,7 @@ const ProductForm: React.FC<Props> = ({ open, onClose, product, onSaved }) => {
             <Field label="Selling Price" error={errors.selling_price?.message as string}><Input type="number" step="0.01" {...register('selling_price')} /></Field>
             <Field label="Discount Price"><Input type="number" step="0.01" {...register('discount_price')} placeholder="Optional" /></Field>
           </div>
+          <div className="mt-4"><Field label="Supplier invoice / order no." hint="The invoice this product's current stock was bought on. Only you can see this."><Input {...register('invoice_no')} placeholder="e.g. 29909937501030126" /></Field></div>
         </div>
 
         <div className="rounded-3xl bg-mint-50 p-4 md:col-span-2">

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, ArrowUpFromLine, Package, Truck } from 'lucide-react';
 import { InvoiceControl } from '../../components/admin/InvoiceControl';
 import { PARTNERS, IMPORT_CATEGORY } from '../../lib/finance';
+import { EditPurchaseModal } from '../../components/admin/EditPurchaseModal';
 import { PaymentBadge, PaymentModal, owedOn, type PurchasePay } from '../../components/admin/finance/SupplierPanel';
 import { supabase, PRODUCT_COSTS_EMBED, withCosts, formatCurrency, formatDate, type Product, type InventoryTransaction, type Purchase, type Supplier } from '../../lib/supabase';
 import { useSettings } from '../../contexts/SettingsContext';
@@ -27,6 +28,7 @@ const AdminInventory: React.FC = () => {
   const [adjustFor, setAdjustFor] = useState<Product | null>(null);
   const [purchaseModal, setPurchaseModal] = useState(false);
   const [payFor, setPayFor] = useState<PurchasePay | null>(null);
+  const [editPurchase, setEditPurchase] = useState<PurchasePay | null>(null);
   const [supplierModal, setSupplierModal] = useState(false);
   const load = async () => {
     const [p, t, pu, s] = await Promise.all([
@@ -133,6 +135,7 @@ const AdminInventory: React.FC = () => {
                     {owedOn(pu as PurchasePay) > 0 && <button onClick={() => setPayFor(pu as PurchasePay)} className="text-xs font-extrabold text-mint-700 hover:underline">Pay {formatCurrency(owedOn(pu as PurchasePay), currency)}</button>}
                   </div>
                   <InvoiceControl table="purchases" id={pu.id} path={pu.invoice_path} name={pu.invoice_name} onChanged={load} />
+                  <button onClick={() => setEditPurchase(pu as PurchasePay)} className="text-xs font-extrabold text-mint-700 hover:underline">Edit invoice no. / details</button>
                 </div>
               </div>
               <div className="text-sm text-ink-600 space-y-1">
@@ -166,6 +169,7 @@ const AdminInventory: React.FC = () => {
       )}
 
       <AdjustModal product={adjustFor} onClose={() => setAdjustFor(null)} onSaved={() => { setAdjustFor(null); load(); }} />
+      <EditPurchaseModal purchase={editPurchase} suppliers={suppliers} onClose={() => setEditPurchase(null)} onSaved={() => { setEditPurchase(null); load(); }} />
       <PaymentModal purchase={payFor} money={n => formatCurrency(n, currency)} onClose={() => setPayFor(null)} onSaved={() => { setPayFor(null); load(); }} />
       <PurchaseModal open={purchaseModal} onClose={() => setPurchaseModal(false)} products={products} suppliers={suppliers} existingRefs={purchases.map(p => (p.reference || '').trim().toLowerCase()).filter(Boolean)} userId={authUserId} onSaved={() => { setPurchaseModal(false); load(); }} />
       <SupplierModal open={supplierModal} onClose={() => setSupplierModal(false)} onSaved={() => { setSupplierModal(false); load(); }} />

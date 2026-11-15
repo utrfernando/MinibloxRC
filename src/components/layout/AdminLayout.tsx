@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { NavLink, Outlet, Link } from 'react-router-dom';
+import { NavLink, Outlet, Link, useLocation } from 'react-router-dom';
+import { AttentionBell } from '../admin/AttentionBell';
 import {
   LayoutDashboard, Package, FolderTree, Boxes, ShoppingCart, Users,
   TicketPercent, Image as ImageIcon, Globe, Settings, MessageSquare,
-  Blocks, ArrowLeft, Menu, Truck, Wallet, ShieldCheck,
+  Blocks, ArrowLeft, Menu, Wallet, ShieldCheck,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useSettings } from '../../contexts/SettingsContext';
@@ -39,6 +40,7 @@ const NAV_GROUPS = [
 const AdminLayout: React.FC = () => {
   const { storeName } = useSettings();
   const [open, setOpen] = useState(false);
+  const { pathname } = useLocation();
 
   const sidebar = (
     <div className="flex flex-col h-full">
@@ -96,8 +98,9 @@ const AdminLayout: React.FC = () => {
         <div className="lg:hidden sticky top-0 z-30 bg-ink-900 text-white flex items-center gap-3 px-4 h-14">
           <button onClick={() => setOpen(true)} className="p-2"><Menu size={22} /></button>
           <span className="font-display font-bold">{storeName} Admin</span>
-          <Truck size={18} className="ml-auto text-mint-400" />
+          <span className="ml-auto"><AttentionBell tone="dark" refreshKey={pathname} /></span>
         </div>
+        <div className="hidden lg:flex justify-end items-center px-8 pt-4 max-w-[1400px] mx-auto"><AttentionBell refreshKey={pathname} /></div>
         <main className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">
           <React.Suspense fallback={<div className="py-20 text-center font-bold text-ink-400">Loading…</div>}><Outlet /></React.Suspense>
         </main>

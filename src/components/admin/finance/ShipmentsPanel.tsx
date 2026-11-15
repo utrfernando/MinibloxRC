@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { formatDate, type Order, type Product } from '../../../lib/supabase';
+import { formatDate, type Order, type Product, type Supplier } from '../../../lib/supabase';
+import { EditPurchaseModal } from '../EditPurchaseModal';
 import { Table, Td } from '../ui';
 import { type PurchasePay } from './SupplierPanel';
 
@@ -20,9 +21,10 @@ type Ship = {
  * the official profit uses the cost saved on each sale.
  */
 export const ShipmentsPanel: React.FC<{
-  purchases: ShipPurchase[]; orders: Order[]; products: Product[]; money: (n: number) => string;
-}> = ({ purchases, orders, products, money }) => {
+  purchases: ShipPurchase[]; orders: Order[]; products: Product[]; suppliers: Supplier[]; money: (n: number) => string; reload: () => void;
+}> = ({ purchases, orders, products, suppliers, money, reload }) => {
   const [open, setOpen] = useState<string | null>(null);
+  const [edit, setEdit] = useState<ShipPurchase | null>(null);
 
   const ships = useMemo<Ship[]>(() => {
     const names = new Map(products.map(p => [p.id, p.name]));
@@ -102,7 +104,7 @@ export const ShipmentsPanel: React.FC<{
           const rows = [(
             <tr key={s.p.id} className="hover:bg-ink-50/50">
               <Td>{s.tracked && <button onClick={() => setOpen(open === s.p.id ? null : s.p.id)} className="text-ink-400" aria-label="Show products">{open === s.p.id ? <ChevronDown size={16} /> : <ChevronRight size={16} />}</button>}</Td>
-              <Td className="font-bold text-ink-900">{s.p.reference || <span className="text-red-500">no invoice no.</span>}</Td>
+              <Td className="font-bold text-ink-900">{s.p.reference || <span className="text-red-500">no invoice no.</span>} <button onClick={() => setEdit(s.p)} className="text-[11px] font-bold text-mint-700 hover:underline">{s.p.reference ? '✎' : 'add'}</button></Td>
               <Td className="text-ink-700">{s.p.supplier?.name || '—'}</Td>
               <Td className="text-xs text-ink-500 whitespace-nowrap">{formatDate(s.p.purchase_date)}</Td>
               <Td>{money(s.cost)}</Td>
@@ -123,6 +125,7 @@ export const ShipmentsPanel: React.FC<{
           return rows;
         })}
       </Table>
+      <EditPurchaseModal purchase={edit} suppliers={suppliers} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); reload(); }} />
     </div>
   );
 };
