@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { Plus, Trash2, ArrowDownToLine, ArrowUpFromLine, AlertTriangle } from 'lucide-react';
-import { supabase, formatDate } from '../../../lib/supabase';
+import { Plus, Trash2, Pencil, ArrowDownToLine, ArrowUpFromLine, AlertTriangle } from 'lucide-react';
+import { supabase, formatDate, uploadInvoice } from '../../../lib/supabase';
+import { InvoiceControl } from '../InvoiceControl';
+import { Paperclip } from 'lucide-react';
 import { PARTNERS, computeFund, fromFund, type Expense, type PartnerTx, type PurchasePayment, type Refund } from '../../../lib/finance';
 import { useToast } from '../../../contexts/ToastContext';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -30,6 +32,14 @@ export const PartnersPanel: React.FC<Props> = ({ txs, expenses, supplierPayments
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(blank);
   const [saving, setSaving] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
+  const openNew = () => { setEditId(null); setForm(blank); setFile(null); setOpen(true); };
+  const openEdit = (t: PartnerTx) => {
+    setEditId(t.id); setFile(null);
+    setForm({ tx_date: t.tx_date, partner: t.partner, kind: t.kind, amount: String(t.amount), note: t.note || '' });
+    setOpen(true);
+  };
 
   const stats = useMemo(() => PARTNERS.map(p => {
     const contributed = txs.filter(t => t.partner === p && t.kind === 'contribution').reduce((s, t) => s + Number(t.amount), 0);
@@ -55,15 +65,25 @@ export const PartnersPanel: React.FC<Props> = ({ txs, expenses, supplierPayments
     if (!form.partner) return error('Choose the partner.');
     if (!(amount > 0)) return error('Enter an amount greater than 0.');
     setSaving(true);
-    const { error: e } = await supabase.from('partner_transactions').insert({ ...form, amount, note: form.note || null, created_by: user?.id });
+    if (editId) {
+      const { error: e } = await supabase.from('partner_transactions').update({ tx_date: form.tx_date, partner: form.partner, kind: form.kind, amount, note: form.note || null }).eq('id', editId);
+      setSaving(false);
+      if (e) return error(e.message);
+      success('Entry updated'); setOpen(false); setForm(blank); setEditId(null); reload();
+      return;
+    }
+    let receipt: Record<string, string> = {};
+    try { if (file) { const up = await uploadInvoice(file, 'deposits'); receipt = { receipt_path: up.path, receipt_name: up.name }; } }
+    catch (err: any) { setSaving(false); return error(err.message || 'Receipt upload failed'); }
+    const { error: e } = await supabase.from('partner_transactions').insert({ ...form, amount, note: form.note || null, created_by: user?.id, ...receipt });
     setSaving(false);
-    if (e) return error(e.message);
-    success('Recorded'); setOpen(false); setForm(blank); reload();
+    if (e) return error(/receipt_/.test(e.message) ? 'Run migration 0017 in Supabase first (receipt columns are missing).' : e.message);
+    success('Recorded'); setOpen(false); setForm(blank); setFile(null); reload();
   };
   const remove = async (t: PartnerTx) => {
     if (!confirm(`Delete this ${money(Number(t.amount))} ${t.kind}?`)) return;
     const { error: e } = await supabase.from('partner_transactions').delete().eq('id', t.id);
-    if (e) error(e.message); else reload();
+    if (e) error(e.message); else { if (t.receipt_path) await supabase.storage.from('invoices').remove([t.receipt_path]); reload(); }
   };
 
   const row = (label: string, value: string, tone = 'text-ink-900') => (
@@ -127,9 +147,9 @@ export const PartnersPanel: React.FC<Props> = ({ txs, expenses, supplierPayments
 
       <div className="flex items-center justify-between">
         <h3 className="font-display text-xl font-extrabold text-ink-900">Contributions & withdrawals</h3>
-        <Button onClick={() => setOpen(true)}><Plus size={16} /> Add entry</Button>
+        <Button onClick={openNew}><Plus size={16} /> Add entry</Button>
       </div>
-      <Table head={['Date', 'Partner', 'Type', 'Note', 'Amount', '']}>
+      <Table head={['Date', 'Partner', 'Type', 'Note', 'Receipt', 'Amount', '']}>
         {txs.length === 0 ? <tr><Td className="text-center py-8 text-ink-400">No entries yet.</Td></tr> : txs.map(t => (
           <tr key={t.id} className="hover:bg-ink-50/50">
             <Td className="text-xs text-ink-500">{formatDate(t.tx_date)}</Td>
@@ -138,22 +158,28 @@ export const PartnersPanel: React.FC<Props> = ({ txs, expenses, supplierPayments
               ? <span className="inline-flex items-center gap-1 text-xs font-extrabold text-mint-700"><ArrowDownToLine size={13} /> Put in</span>
               : <span className="inline-flex items-center gap-1 text-xs font-extrabold text-red-500"><ArrowUpFromLine size={13} /> Taken out</span>}</Td>
             <Td className="text-ink-600">{t.note || '—'}</Td>
+            <Td><InvoiceControl table="partner_transactions" id={t.id} path={t.receipt_path} name={t.receipt_name} onChanged={reload} /></Td>
             <Td className="font-bold text-ink-900">{money(Number(t.amount))}</Td>
-            <Td><button onClick={() => remove(t)} className="p-2 rounded-full hover:bg-red-50 text-red-500" aria-label="Delete"><Trash2 size={15} /></button></Td>
+            <Td><div className="flex"><button onClick={() => openEdit(t)} className="p-2 rounded-full hover:bg-ink-100 text-ink-500" aria-label="Edit"><Pencil size={15} /></button><button onClick={() => remove(t)} className="p-2 rounded-full hover:bg-red-50 text-red-500" aria-label="Delete"><Trash2 size={15} /></button></div></Td>
           </tr>
         ))}
       </Table>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Add partner entry">
+      <Modal open={open} onClose={() => setOpen(false)} title={editId ? 'Edit partner entry' : 'Add partner entry'}>
         <div className="grid sm:grid-cols-2 gap-4">
           <Field label="Date"><Input type="date" value={form.tx_date} onChange={e => setForm({ ...form, tx_date: e.target.value })} /></Field>
           <Field label="Amount"><Input type="number" min="0" step="0.01" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} /></Field>
           <Field label="Partner"><Select value={form.partner} onChange={e => setForm({ ...form, partner: e.target.value })}><option value="">Select…</option>{PARTNERS.map(p => <option key={p}>{p}</option>)}</Select></Field>
           <Field label="Type"><Select value={form.kind} onChange={e => setForm({ ...form, kind: e.target.value })}><option value="contribution">Put money in (contribution)</option><option value="withdrawal">Took money out / paid back / profit share</option></Select></Field>
+          {!editId && (<div className="sm:col-span-2"><Field label="Receipt / bank slip (optional)">
+            <label className="flex items-center gap-2 rounded-2xl border-2 border-dashed border-ink-200 px-4 py-3 text-sm cursor-pointer hover:border-mint-400">
+              <Paperclip size={16} className="text-mint-600" /><span className="font-semibold text-ink-700 truncate">{file ? file.name : 'Photo or PDF of the transfer slip (max 15 MB)'}</span>
+              <input type="file" className="hidden" accept=".pdf,.png,.jpg,.jpeg,.webp" onChange={e => setFile(e.target.files?.[0] || null)} />
+            </label></Field></div>)}
           <div className="sm:col-span-2"><Field label="Note"><Input value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} placeholder="e.g. Paid Davide back for stock, profit share for March" /></Field></div>
         </div>
         <p className="mt-3 text-xs font-semibold text-ink-500">Don't add a contribution for money a partner already paid straight to a supplier or for an expense — that is counted automatically.</p>
-        <div className="flex justify-end gap-2 mt-5"><Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button><Button loading={saving} onClick={save}>Save</Button></div>
+        <div className="flex justify-end gap-2 mt-5"><Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button><Button loading={saving} onClick={save}>{editId ? 'Save changes' : 'Save'}</Button></div>
       </Modal>
     </div>
   );

@@ -19,10 +19,10 @@ export type Expense = {
   paid_to: string | null; payment_method: string | null; reference: string | null; paid_by?: string | null; paid_from?: string | null;
   invoice_path?: string | null; invoice_name?: string | null;
 };
-export type PartnerTx = { id: string; tx_date: string; partner: string; kind: 'contribution' | 'withdrawal'; amount: number; note: string | null };
+export type PartnerTx = { id: string; tx_date: string; partner: string; kind: 'contribution' | 'withdrawal'; amount: number; note: string | null; receipt_path?: string | null; receipt_name?: string | null };
 export type OrderCost = { order_id: string; delivery_cost: number; payment_fee: number; received_by?: string | null; received_at?: string | null };
-export type PurchasePayment = { id: string; purchase_id: string; pay_date: string; amount: number; paid_by: string | null; paid_from?: string | null; method: string | null; reference: string | null; note: string | null };
-export type Refund = { id: string; order_id: string; refund_date: string; amount: number; refunded_by: string | null; paid_from?: string | null; method: string | null; reason: string | null };
+export type PurchasePayment = { id: string; purchase_id: string; pay_date: string; amount: number; paid_by: string | null; paid_from?: string | null; method: string | null; reference: string | null; note: string | null; receipt_path?: string | null; receipt_name?: string | null };
+export type Refund = { id: string; order_id: string; refund_date: string; amount: number; refunded_by: string | null; paid_from?: string | null; method: string | null; reason: string | null; receipt_path?: string | null; receipt_name?: string | null };
 export type ItemCost = { order_item_id: string; unit_cost: number };
 
 /** True when a payment came out of the business fund (not a partner's own pocket). */

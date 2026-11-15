@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { EditPurchaseModal } from '../EditPurchaseModal';
-import { Wallet, History, Trash2, Phone, Mail, MapPin, User } from 'lucide-react';
-import { supabase, formatDate, type Purchase, type Supplier } from '../../../lib/supabase';
+import { Wallet, History, Trash2, Pencil, Phone, Mail, MapPin, User } from 'lucide-react';
+import { supabase, formatDate, uploadInvoice, type Purchase, type Supplier } from '../../../lib/supabase';
+import { InvoiceControl } from '../InvoiceControl';
 import { PARTNERS, type PurchasePayment } from '../../../lib/finance';
 import { PaidFromSelect } from './PaidFromSelect';
 import { useToast } from '../../../contexts/ToastContext';
@@ -34,7 +35,8 @@ export const PaymentModal: React.FC<{ purchase: PurchasePay | null; money: (n: n
   const [method, setMethod] = useState('bank');
   const [reference, setReference] = useState('');
   const [saving, setSaving] = useState(false);
-  React.useEffect(() => { if (purchase) { setAmount(String(owedOn(purchase))); setPaidBy(''); setReference(purchase.reference || ''); } }, [purchase]);
+  const [file, setFile] = useState<File | null>(null);
+  React.useEffect(() => { if (purchase) { setFile(null); setAmount(String(owedOn(purchase))); setPaidBy(''); setReference(purchase.reference || ''); } }, [purchase]);
   if (!purchase) return null;
   const owed = owedOn(purchase);
 
@@ -43,11 +45,14 @@ export const PaymentModal: React.FC<{ purchase: PurchasePay | null; money: (n: n
     if (!(a > 0)) return error('Enter an amount greater than 0.');
     if (!paidBy) return error('Choose which partner paid this.');
     setSaving(true);
+    let receipt: Record<string, string> = {};
+    try { if (file) { const up = await uploadInvoice(file, 'payments'); receipt = { receipt_path: up.path, receipt_name: up.name }; } }
+    catch (err: any) { setSaving(false); return error(err.message || 'Receipt upload failed'); }
     const { error: e } = await supabase.from('purchase_payments').insert({
-      purchase_id: purchase.id, pay_date: date, amount: a, paid_by: paidBy, paid_from: paidFrom, method, reference: reference || null, created_by: user?.id,
+      purchase_id: purchase.id, pay_date: date, amount: a, paid_by: paidBy, paid_from: paidFrom, method, reference: reference || null, created_by: user?.id, ...receipt,
     });
     setSaving(false);
-    if (e) return error(/purchase_payments/.test(e.message) ? 'Run migration 0013 in Supabase first (supplier payments table is missing).' : e.message);
+    if (e) return error(/receipt_/.test(e.message) ? 'Run migration 0017 in Supabase first (receipt columns are missing).' : /purchase_payments/.test(e.message) ? 'Run migration 0013 in Supabase first (supplier payments table is missing).' : e.message);
     success('Payment recorded'); onSaved();
   };
 
@@ -60,6 +65,11 @@ export const PaymentModal: React.FC<{ purchase: PurchasePay | null; money: (n: n
         <Field label="Done by (who made the payment)"><Select value={paidBy} onChange={e => setPaidBy(e.target.value)}><option value="">Select…</option>{PARTNERS.map(p => <option key={p}>{p}</option>)}</Select></Field>
         <PaidFromSelect value={paidFrom} onChange={setPaidFrom} />
         <Field label="Method"><Select value={method} onChange={e => setMethod(e.target.value)}><option value="bank">Bank transfer</option><option value="cash">Cash</option><option value="card">Card</option><option value="other">Other</option></Select></Field>
+        <div className="sm:col-span-2"><Field label="Payment receipt / slip (optional)">
+          <label className="flex items-center gap-2 rounded-2xl border-2 border-dashed border-ink-200 px-4 py-3 text-sm cursor-pointer hover:border-mint-400">
+            <span className="font-semibold text-ink-700 truncate">{file ? file.name : '📎 Screenshot or PDF of the payment (max 15 MB)'}</span>
+            <input type="file" className="hidden" accept=".pdf,.png,.jpg,.jpeg,.webp" onChange={e => setFile(e.target.files?.[0] || null)} />
+          </label></Field></div>
         <div className="sm:col-span-2"><Field label="Invoice / order no." hint="Filled in from the purchase; change it if this payment has its own slip number"><Input value={reference} onChange={e => setReference(e.target.value)} placeholder="Invoice no., transfer slip no." /></Field></div>
       </div>
       <div className="flex justify-end gap-2 mt-5"><Button variant="ghost" onClick={onClose}>Cancel</Button><Button loading={saving} onClick={save}>Save payment</Button></div>
@@ -67,15 +77,50 @@ export const PaymentModal: React.FC<{ purchase: PurchasePay | null; money: (n: n
   );
 };
 
+/** Fix a payment that was entered wrongly: amount, date, who made it, where the money came from, method, reference. */
+const EditPaymentModal: React.FC<{ payment: PurchasePayment | null; onClose: () => void; onSaved: () => void }> = ({ payment, onClose, onSaved }) => {
+  const { success, error } = useToast();
+  const [f, setF] = useState({ amount: '', date: '', paidBy: '', paidFrom: 'fund', method: 'bank', reference: '' });
+  const [saving, setSaving] = useState(false);
+  React.useEffect(() => {
+    if (payment) setF({ amount: String(payment.amount), date: payment.pay_date, paidBy: payment.paid_by || '', paidFrom: payment.paid_from || 'own', method: payment.method || 'bank', reference: payment.reference || '' });
+  }, [payment]);
+  if (!payment) return null;
+  const save = async () => {
+    const a = Number(f.amount);
+    if (!(a > 0)) return error('Enter an amount greater than 0.');
+    if (!f.paidBy) return error('Choose which partner made this payment.');
+    setSaving(true);
+    const { error: e } = await supabase.from('purchase_payments').update({ amount: a, pay_date: f.date, paid_by: f.paidBy, paid_from: f.paidFrom, method: f.method, reference: f.reference.trim() || null }).eq('id', payment.id);
+    setSaving(false);
+    if (e) return error(e.message);
+    success('Payment updated'); onSaved();
+  };
+  return (
+    <Modal open onClose={onClose} title="Edit payment">
+      <div className="grid sm:grid-cols-2 gap-4">
+        <Field label="Amount"><Input type="number" min="0" step="0.01" value={f.amount} onChange={e => setF({ ...f, amount: e.target.value })} /></Field>
+        <Field label="Date"><Input type="date" value={f.date} onChange={e => setF({ ...f, date: e.target.value })} /></Field>
+        <Field label="Done by (who made the payment)"><Select value={f.paidBy} onChange={e => setF({ ...f, paidBy: e.target.value })}><option value="">Select…</option>{PARTNERS.map(p => <option key={p}>{p}</option>)}</Select></Field>
+        <PaidFromSelect value={f.paidFrom} onChange={v => setF({ ...f, paidFrom: v })} />
+        <Field label="Method"><Select value={f.method} onChange={e => setF({ ...f, method: e.target.value })}><option value="bank">Bank transfer</option><option value="cash">Cash</option><option value="card">Card</option><option value="other">Other</option></Select></Field>
+        <Field label="Invoice / slip no."><Input value={f.reference} onChange={e => setF({ ...f, reference: e.target.value })} /></Field>
+      </div>
+      <div className="flex justify-end gap-2 mt-5"><Button variant="ghost" onClick={onClose}>Cancel</Button><Button loading={saving} onClick={save}>Save changes</Button></div>
+    </Modal>
+  );
+};
+
 /** All payments made against one purchase, newest first. A wrong entry can be deleted and re-entered. */
 const HistoryModal: React.FC<{ purchase: PurchasePay | null; payments: PurchasePayment[]; money: (n: number) => string; onClose: () => void; onChanged: () => void }> = ({ purchase, payments, money, onClose, onChanged }) => {
   const { error } = useToast();
+  const [editing, setEditing] = useState<PurchasePayment | null>(null);
   if (!purchase) return null;
   const list = payments.filter(p => p.purchase_id === purchase.id).sort((a, b) => b.pay_date.localeCompare(a.pay_date));
   const remove = async (p: PurchasePayment) => {
     if (!confirm(`Delete this ${money(Number(p.amount))} payment? The amount owed will go back up.`)) return;
     const { error: e } = await supabase.from('purchase_payments').delete().eq('id', p.id);
-    if (e) error(e.message); else onChanged();
+    if (e) error(e.message); else { if (p.receipt_path) await supabase.storage.from('invoices').remove([p.receipt_path]); onChanged(); }
   };
   return (
     <Modal open onClose={onClose} title={`Payments — ${purchase.supplier?.name || 'Supplier'} ${purchase.reference || ''}`}>
@@ -87,11 +132,14 @@ const HistoryModal: React.FC<{ purchase: PurchasePay | null; payments: PurchaseP
                 <p className="font-bold text-ink-900">{money(Number(p.amount))} <span className="font-semibold text-ink-500">· {p.paid_by || 'payer not recorded'}</span></p>
                 <p className="text-xs text-ink-400">{formatDate(p.pay_date)} · {p.method || '—'}{p.reference ? ` · ${p.reference}` : ''}{p.note ? ` · ${p.note}` : ''}</p>
               </div>
+              <InvoiceControl table="purchase_payments" id={p.id} path={p.receipt_path} name={p.receipt_name} onChanged={onChanged} />
+              <button onClick={() => setEditing(p)} className="p-2 rounded-full hover:bg-ink-100 text-ink-500" aria-label="Edit payment"><Pencil size={15} /></button>
               <button onClick={() => remove(p)} className="p-2 rounded-full hover:bg-red-50 text-red-500" aria-label="Delete payment"><Trash2 size={15} /></button>
             </li>
           ))}
         </ul>
       )}
+      <EditPaymentModal payment={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); onChanged(); }} />
       <p className="text-xs text-ink-400 font-semibold mt-3">Total {money(Number(purchase.total_cost))} · paid {money(Number(purchase.amount_paid || 0))} · owed {money(owedOn(purchase))}</p>
     </Modal>
   );

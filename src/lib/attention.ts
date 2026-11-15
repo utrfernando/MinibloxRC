@@ -19,7 +19,7 @@ const DEFAULT_EMAIL = 'hello@miniblox.lk';
 /** Looks across your records for anything that still needs entering or fixing. Read-only. */
 export async function loadAttention(currency = 'LKR'): Promise<AttentionItem[]> {
   const money = (n: number) => formatCurrency(n, currency);
-  const [purchases, expenses, payments, refunds, orders, orderCosts, products, suppliers, settings, alerts, fundTx, fundExp, fundPay, fundRef] = await Promise.all([
+  const [purchases, expenses, payments, refunds, orders, orderCosts, products, suppliers, settings, alerts, fundTx, fundExp, fundPay, fundRef, depRc, payRc] = await Promise.all([
     supabase.from('purchases').select('id,reference,invoice_path,total_cost,amount_paid,supplier:suppliers(name),items:purchase_items(id)'),
     supabase.from('expenses').select('id,description,category,paid_by,invoice_path,reference,amount'),
     supabase.from('purchase_payments').select('id,paid_by,reference'),
@@ -35,6 +35,8 @@ export async function loadAttention(currency = 'LKR'): Promise<AttentionItem[]> 
     supabase.from('expenses').select('amount,paid_from'),
     supabase.from('purchase_payments').select('amount,paid_from'),
     supabase.from('order_refunds').select('amount,paid_from'),
+    supabase.from('partner_transactions').select('id,kind,receipt_path'),
+    supabase.from('purchase_payments').select('id,receipt_path'),
   ]);
 
   const out: AttentionItem[] = [];
@@ -61,6 +63,16 @@ export async function loadAttention(currency = 'LKR'): Promise<AttentionItem[]> 
     const out = sum((fundExp.data || []).filter((x: any) => x.paid_from === 'fund')) + sum((fundPay.data || []).filter((x: any) => x.paid_from === 'fund')) + sum((fundRef.data || []).filter((x: any) => x.paid_from === 'fund'));
     const balance = deposits - withdrawn - out;
     push({ key: 'fund-overspent', level: 'high', count: balance < 0 ? 1 : 0, title: `Business fund is overspent by ${money(-balance)}`, detail: 'Payments were made from the fund but not enough was deposited. Add the deposit (Partners → Add entry) or mark those payments "Own pocket".', to: '/admin/finance/partners', action: 'Open Partners' });
+  }
+
+  // ---- receipts for money that moved
+  if (!depRc.error) {
+    const noRc = (depRc.data || []).filter((t: any) => t.kind === 'contribution' && blank(t.receipt_path));
+    push({ key: 'deposit-no-receipt', level: 'medium', count: noRc.length, title: 'Deposits with no receipt', detail: 'Attach the bank slip so every deposit into the fund can be proved.', to: '/admin/finance/partners', action: 'Attach receipts' });
+  }
+  if (!payRc.error) {
+    const noRc = (payRc.data || []).filter((p: any) => blank(p.receipt_path));
+    push({ key: 'payment-no-receipt', level: 'medium', count: noRc.length, title: 'Supplier payments with no receipt', detail: 'Open a shipment\'s payment history and attach the payment slip.', to: '/admin/finance/suppliers', action: 'Open Suppliers' });
   }
 
   // ---- supplier purchases ----------------------------------------------------------------------
