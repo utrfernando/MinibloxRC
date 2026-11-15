@@ -19,7 +19,7 @@ const DEFAULT_EMAIL = 'hello@miniblox.lk';
 /** Looks across your records for anything that still needs entering or fixing. Read-only. */
 export async function loadAttention(currency = 'LKR'): Promise<AttentionItem[]> {
   const money = (n: number) => formatCurrency(n, currency);
-  const [purchases, expenses, payments, refunds, orders, orderCosts, products, suppliers, settings] = await Promise.all([
+  const [purchases, expenses, payments, refunds, orders, orderCosts, products, suppliers, settings, alerts] = await Promise.all([
     supabase.from('purchases').select('id,reference,invoice_path,total_cost,amount_paid,supplier:suppliers(name),items:purchase_items(id)'),
     supabase.from('expenses').select('id,description,category,paid_by,invoice_path,reference,amount'),
     supabase.from('purchase_payments').select('id,paid_by,reference'),
@@ -29,6 +29,7 @@ export async function loadAttention(currency = 'LKR'): Promise<AttentionItem[]> 
     supabase.from('products').select('id,name,status,stock_quantity,low_stock_threshold,selling_price,discount_price,costs:product_costs(*),images:product_images(id)'),
     supabase.from('suppliers').select('id,name,contact_person,phone,email'),
     supabase.from('website_settings').select('setting_key,setting_value'),
+    supabase.from('alert_settings').select('telegram_bot_token,telegram_chat_id,enabled').eq('id', 1).maybeSingle(),
   ]);
 
   const out: AttentionItem[] = [];
@@ -42,6 +43,10 @@ export async function loadAttention(currency = 'LKR'): Promise<AttentionItem[]> 
   push({ key: 'store-contact', level: 'medium', count: badContact.length, title: 'Store contact details are still placeholders', detail: `Your ${badContact.join(', ')} still show the sample value. Customers, invoices and the chat helper use these.`, to: '/admin/settings', action: 'Fix in Store Settings' });
   const fakeBank = blank(bank.account_number) || /^[xX*#\-\s0]+$/.test(String(bank.account_number));
   push({ key: 'bank-details', level: 'high', count: fakeBank ? 1 : 0, title: blank(bank.account_number) ? 'Bank transfer details are empty' : 'Bank account number is still a placeholder', detail: 'Customers who choose bank transfer are shown these details at checkout — they cannot pay you without real ones.', to: '/admin/settings', action: 'Add bank details' });
+
+  const al: any = alerts.data;
+  const alertsOk = !alerts.error && al && al.enabled !== false && !blank(al.telegram_bot_token) && !blank(al.telegram_chat_id);
+  push({ key: 'order-alerts', level: 'medium', count: alertsOk ? 0 : 1, title: 'Order alerts on Telegram are not set up', detail: alerts.error ? 'Run migration 0015 in Supabase, then set it up in Store Settings.' : 'Get a phone message the moment a customer orders.', to: '/admin/settings', action: 'Set up alerts' });
 
   // ---- supplier purchases ----------------------------------------------------------------------
   const pu: any[] = purchases.data || [];

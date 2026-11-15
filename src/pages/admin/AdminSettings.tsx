@@ -1,3 +1,4 @@
+import { OrderAlertsCard } from '../../components/admin/OrderAlertsCard';
 import React, { useEffect, useState } from 'react';
 import { Save } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -74,6 +75,8 @@ const AdminSettings: React.FC = () => {
         </div>
         <div className="mt-4"><Button onClick={() => save('store', store)} loading={saving === 'store'}><Save size={16} /> Save Store Settings</Button></div>
       </section>
+
+      <OrderAlertsCard />
 
       <section className="rounded-4xl border border-ink-100 bg-white p-6 shadow-soft">
         <h2 className="font-display text-lg font-extrabold text-ink-900 mb-4">Bank Transfer Details</h2>
