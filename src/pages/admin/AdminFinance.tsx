@@ -272,7 +272,7 @@ const AdminFinance: React.FC = () => {
 
         </>}
 
-        {tab === 'expenses' && <>
+        {(tab === 'overview' || tab === 'expenses') && <>
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-display text-xl font-extrabold text-ink-900">Expense ledger</h3>
           <Button variant="ghost" size="sm" onClick={exportExpenses} disabled={!f.exp.length}><Download size={14} /> Export CSV</Button>
@@ -300,10 +300,12 @@ const AdminFinance: React.FC = () => {
             </tr>
           ))}
         </Table>
-        <div className="grid xl:grid-cols-2 gap-6 mt-8">
-          <BudgetsPanel budgets={budgets} expenses={expenses} money={money} reload={load} />
-          <RecurringPanel items={recurring} money={money} reload={load} />
-        </div>
+        {tab === 'expenses' && (
+          <div className="grid xl:grid-cols-2 gap-6 mt-8">
+            <BudgetsPanel budgets={budgets} expenses={expenses} money={money} reload={load} />
+            <RecurringPanel items={recurring} money={money} reload={load} />
+          </div>
+        )}
         </>}
 
         {tab === 'partners' && <PartnersPanel txs={txs} expenses={expenses} money={money} reload={load} />}

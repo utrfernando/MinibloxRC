@@ -19,7 +19,9 @@ const AdminUsers: React.FC = () => {
 
   const load = async () => {
     const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
-    setUsers((data || []) as Profile[]);
+    // team (admins) first, then everyone else newest-first
+    const list = (data || []) as Profile[];
+    setUsers([...list.filter(u => u.role === 'admin'), ...list.filter(u => u.role !== 'admin')]);
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
@@ -44,7 +46,7 @@ const AdminUsers: React.FC = () => {
 
   return (
     <div>
-      <AdminHeader title="Users & Access" subtitle="Manage who can sign in, who is an admin, and reset passwords" />
+      <AdminHeader title="Users & Access" subtitle="Your team (admins) and customers — manage access and reset passwords" />
       <div className="grid sm:grid-cols-3 gap-4 mb-6">
         <StatCard label="All users" value={String(users.length)} tone="mint" />
         <StatCard label="Admins" value={String(admins)} tone="lavender" />

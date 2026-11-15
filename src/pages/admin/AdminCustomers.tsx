@@ -6,6 +6,7 @@ import { AdminHeader, Table, Td } from '../../components/admin/ui';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
 import { PasswordActions } from '../../components/admin/PasswordActions';
+import { Link } from 'react-router-dom';
 
 const AdminCustomers: React.FC = () => {
   const { currency } = useSettings();
@@ -41,6 +42,7 @@ const AdminCustomers: React.FC = () => {
   return (
     <div>
       <AdminHeader title="Customers" subtitle={`${customers.length} registered customer(s)`} />
+      <p className="-mt-3 mb-5 text-sm font-semibold text-ink-500">Shoppers only. Your team (admins, e.g. Davide) are listed under <Link to="/admin/users" className="text-mint-600 underline">Users &amp; Access</Link>.</p>
       <div className="relative max-w-sm mb-5">
         <Search size={17} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-400" />
         <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Search customers…" className="!pl-10" />
