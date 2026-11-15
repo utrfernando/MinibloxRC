@@ -4,6 +4,7 @@ import { EditPurchaseModal } from '../EditPurchaseModal';
 import { Wallet, History, Trash2, Phone, Mail, MapPin, User } from 'lucide-react';
 import { supabase, formatDate, type Purchase, type Supplier } from '../../../lib/supabase';
 import { PARTNERS, type PurchasePayment } from '../../../lib/finance';
+import { PaidFromSelect } from './PaidFromSelect';
 import { useToast } from '../../../contexts/ToastContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Table, Td } from '../ui';
@@ -29,6 +30,7 @@ export const PaymentModal: React.FC<{ purchase: PurchasePay | null; money: (n: n
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [paidBy, setPaidBy] = useState('');
+  const [paidFrom, setPaidFrom] = useState('fund');
   const [method, setMethod] = useState('bank');
   const [reference, setReference] = useState('');
   const [saving, setSaving] = useState(false);
@@ -42,7 +44,7 @@ export const PaymentModal: React.FC<{ purchase: PurchasePay | null; money: (n: n
     if (!paidBy) return error('Choose which partner paid this.');
     setSaving(true);
     const { error: e } = await supabase.from('purchase_payments').insert({
-      purchase_id: purchase.id, pay_date: date, amount: a, paid_by: paidBy, method, reference: reference || null, created_by: user?.id,
+      purchase_id: purchase.id, pay_date: date, amount: a, paid_by: paidBy, paid_from: paidFrom, method, reference: reference || null, created_by: user?.id,
     });
     setSaving(false);
     if (e) return error(/purchase_payments/.test(e.message) ? 'Run migration 0013 in Supabase first (supplier payments table is missing).' : e.message);
@@ -55,7 +57,8 @@ export const PaymentModal: React.FC<{ purchase: PurchasePay | null; money: (n: n
       <div className="grid sm:grid-cols-2 gap-4">
         <Field label="Amount paid now"><Input type="number" min="0" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} /></Field>
         <Field label="Payment date"><Input type="date" value={date} onChange={e => setDate(e.target.value)} /></Field>
-        <Field label="Paid by (from own pocket)"><Select value={paidBy} onChange={e => setPaidBy(e.target.value)}><option value="">Select…</option>{PARTNERS.map(p => <option key={p}>{p}</option>)}</Select></Field>
+        <Field label="Done by (who made the payment)"><Select value={paidBy} onChange={e => setPaidBy(e.target.value)}><option value="">Select…</option>{PARTNERS.map(p => <option key={p}>{p}</option>)}</Select></Field>
+        <PaidFromSelect value={paidFrom} onChange={setPaidFrom} />
         <Field label="Method"><Select value={method} onChange={e => setMethod(e.target.value)}><option value="bank">Bank transfer</option><option value="cash">Cash</option><option value="card">Card</option><option value="other">Other</option></Select></Field>
         <div className="sm:col-span-2"><Field label="Invoice / order no." hint="Filled in from the purchase; change it if this payment has its own slip number"><Input value={reference} onChange={e => setReference(e.target.value)} placeholder="Invoice no., transfer slip no." /></Field></div>
       </div>

@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Plus, Trash2, ArrowDownToLine, ArrowUpFromLine, AlertTriangle } from 'lucide-react';
 import { supabase, formatDate } from '../../../lib/supabase';
-import { PARTNERS, type Expense, type PartnerTx, type PurchasePayment, type Refund } from '../../../lib/finance';
+import { PARTNERS, computeFund, fromFund, type Expense, type PartnerTx, type PurchasePayment, type Refund } from '../../../lib/finance';
 import { useToast } from '../../../contexts/ToastContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Table, Td } from '../ui';
@@ -34,13 +34,18 @@ export const PartnersPanel: React.FC<Props> = ({ txs, expenses, supplierPayments
   const stats = useMemo(() => PARTNERS.map(p => {
     const contributed = txs.filter(t => t.partner === p && t.kind === 'contribution').reduce((s, t) => s + Number(t.amount), 0);
     const withdrawn = txs.filter(t => t.partner === p && t.kind === 'withdrawal').reduce((s, t) => s + Number(t.amount), 0);
-    const spent = expenses.filter(e => e.paid_by === p).reduce((s, e) => s + Number(e.amount), 0);
-    const suppliers = supplierPayments.filter(x => x.paid_by === p).reduce((s, x) => s + Number(x.amount), 0);
-    const refunded = refunds.filter(r => r.refunded_by === p).reduce((s, r) => s + Number(r.amount), 0);
+    // only payments made from the partner's OWN pocket count as their investment; fund payments come out of the deposits
+    const spent = expenses.filter(e => e.paid_by === p && !fromFund(e)).reduce((s, e) => s + Number(e.amount), 0);
+    const suppliers = supplierPayments.filter(x => x.paid_by === p && !fromFund(x)).reduce((s, x) => s + Number(x.amount), 0);
+    const refunded = refunds.filter(r => r.refunded_by === p && !fromFund(r)).reduce((s, r) => s + Number(r.amount), 0);
+    const handled = expenses.filter(e => e.paid_by === p && fromFund(e)).reduce((s, e) => s + Number(e.amount), 0)
+      + supplierPayments.filter(x => x.paid_by === p && fromFund(x)).reduce((s, x) => s + Number(x.amount), 0)
+      + refunds.filter(r => r.refunded_by === p && fromFund(r)).reduce((s, r) => s + Number(r.amount), 0);
     const held = salesHeld.byPartner[p] || 0;
     const putIn = contributed + spent + suppliers + refunded;
-    return { p, contributed, withdrawn, spent, suppliers, refunded, held, putIn, net: putIn - withdrawn, balance: putIn - withdrawn - held };
+    return { p, contributed, withdrawn, spent, suppliers, refunded, handled, held, putIn, net: putIn - withdrawn, balance: putIn - withdrawn - held };
   }), [txs, expenses, supplierPayments, refunds, salesHeld]);
+  const fund = useMemo(() => computeFund(txs, expenses, supplierPayments, refunds), [txs, expenses, supplierPayments, refunds]);
   const totalNet = stats.reduce((s, x) => s + Math.max(0, x.net), 0);
 
   const missingPayer = expenses.filter(e => !e.paid_by).length + supplierPayments.filter(x => !x.paid_by).length + refunds.filter(r => !r.refunded_by).length;
@@ -77,6 +82,21 @@ export const PartnersPanel: React.FC<Props> = ({ txs, expenses, supplierPayments
         </div>
       )}
 
+      <div className={`rounded-4xl border-2 p-5 shadow-soft ${fund.balance >= 0 ? 'border-mint-200 bg-mint-50' : 'border-red-200 bg-red-50'}`}>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-xs font-extrabold uppercase tracking-wide text-ink-500">Business fund — money available for expenses</p>
+            <p className={`font-display text-3xl font-extrabold ${fund.balance >= 0 ? 'text-mint-700' : 'text-red-500'}`}>{money(fund.balance)}</p>
+          </div>
+          <dl className="grid grid-cols-3 gap-4 text-center text-xs">
+            <div><dt className="font-semibold text-ink-500">Deposited</dt><dd className="font-extrabold text-ink-900">{money(fund.deposits)}</dd></div>
+            <div><dt className="font-semibold text-ink-500">Paid out</dt><dd className="font-extrabold text-ink-900">−{money(fund.spent)}</dd></div>
+            <div><dt className="font-semibold text-ink-500">Withdrawn</dt><dd className="font-extrabold text-ink-900">−{money(fund.withdrawals)}</dd></div>
+          </dl>
+        </div>
+        <p className="mt-2 text-xs font-semibold text-ink-500">{fund.balance < 0 ? 'The fund has paid out more than was deposited — add a deposit below (or mark those payments as "Own pocket").' : 'How it works: a partner deposits money here (Add entry → Put money in). Expenses, supplier payments and refunds are then paid from the fund. The partner who makes each payment is recorded, but it is not counted as their own money.'}</p>
+      </div>
+
       <div className="grid sm:grid-cols-2 gap-4">
         {stats.map(s => (
           <div key={s.p} className="rounded-4xl border border-ink-100 bg-white p-5 shadow-soft">
@@ -85,11 +105,12 @@ export const PartnersPanel: React.FC<Props> = ({ txs, expenses, supplierPayments
               <span className="rounded-full bg-lavender-50 text-lavender-600 px-3 py-1 text-xs font-extrabold">{totalNet > 0 ? Math.round((Math.max(0, s.net) / totalNet) * 100) : 0}% of money invested</span>
             </div>
             <dl className="space-y-1.5 text-sm">
-              {row('Cash put in (contributions)', money(s.contributed))}
-              {row('Business expenses paid', money(s.spent))}
-              {row('Supplier payments made', money(s.suppliers))}
-              {row('Customer refunds paid', money(s.refunded))}
+              {row('Deposited into the fund (contributions)', money(s.contributed))}
+              {row('Expenses paid from own pocket', money(s.spent))}
+              {row('Supplier payments from own pocket', money(s.suppliers))}
+              {row('Refunds from own pocket', money(s.refunded))}
               {row('Taken out (withdrawals)', `−${money(s.withdrawn)}`, 'text-red-500')}
+              {s.handled > 0 && <p className="text-[11px] font-semibold text-ink-400">Also handled {money(s.handled)} of payments from the business fund (not counted as their money).</p>}
               <div className="flex justify-between border-t border-ink-100 pt-2 mt-2"><dt className="font-extrabold text-ink-800">Net invested</dt><dd className="font-extrabold text-mint-700">{money(s.net)}</dd></div>
               {row('Customer money they hold for the business', `−${money(s.held)}`, 'text-red-500')}
               <div className="flex justify-between border-t border-ink-100 pt-2 mt-2">

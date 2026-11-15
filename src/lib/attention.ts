@@ -19,7 +19,7 @@ const DEFAULT_EMAIL = 'hello@miniblox.lk';
 /** Looks across your records for anything that still needs entering or fixing. Read-only. */
 export async function loadAttention(currency = 'LKR'): Promise<AttentionItem[]> {
   const money = (n: number) => formatCurrency(n, currency);
-  const [purchases, expenses, payments, refunds, orders, orderCosts, products, suppliers, settings, alerts] = await Promise.all([
+  const [purchases, expenses, payments, refunds, orders, orderCosts, products, suppliers, settings, alerts, fundTx, fundExp, fundPay, fundRef] = await Promise.all([
     supabase.from('purchases').select('id,reference,invoice_path,total_cost,amount_paid,supplier:suppliers(name),items:purchase_items(id)'),
     supabase.from('expenses').select('id,description,category,paid_by,invoice_path,reference,amount'),
     supabase.from('purchase_payments').select('id,paid_by,reference'),
@@ -30,6 +30,11 @@ export async function loadAttention(currency = 'LKR'): Promise<AttentionItem[]> 
     supabase.from('suppliers').select('id,name,contact_person,phone,email'),
     supabase.from('website_settings').select('setting_key,setting_value'),
     supabase.from('alert_settings').select('telegram_bot_token,telegram_chat_id,enabled').eq('id', 1).maybeSingle(),
+    // business fund (separate queries so a missing column can never hide the other alerts)
+    supabase.from('partner_transactions').select('kind,amount'),
+    supabase.from('expenses').select('amount,paid_from'),
+    supabase.from('purchase_payments').select('amount,paid_from'),
+    supabase.from('order_refunds').select('amount,paid_from'),
   ]);
 
   const out: AttentionItem[] = [];
@@ -47,6 +52,16 @@ export async function loadAttention(currency = 'LKR'): Promise<AttentionItem[]> 
   const al: any = alerts.data;
   const alertsOk = !alerts.error && al && al.enabled !== false && !blank(al.telegram_bot_token) && !blank(al.telegram_chat_id);
   push({ key: 'order-alerts', level: 'medium', count: alertsOk ? 0 : 1, title: 'Order alerts on Telegram are not set up', detail: alerts.error ? 'Run migration 0015 in Supabase, then set it up in Store Settings.' : 'Get a phone message the moment a customer orders.', to: '/admin/settings#order-alerts', action: 'Set up alerts' });
+
+  // ---- business fund: deposits in, payments out
+  if (!fundTx.error && !fundExp.error && !fundPay.error && !fundRef.error) {
+    const sum = (a: any[]) => a.reduce((s, x) => s + Number(x.amount), 0);
+    const deposits = sum((fundTx.data || []).filter((t: any) => t.kind === 'contribution'));
+    const withdrawn = sum((fundTx.data || []).filter((t: any) => t.kind === 'withdrawal'));
+    const out = sum((fundExp.data || []).filter((x: any) => x.paid_from === 'fund')) + sum((fundPay.data || []).filter((x: any) => x.paid_from === 'fund')) + sum((fundRef.data || []).filter((x: any) => x.paid_from === 'fund'));
+    const balance = deposits - withdrawn - out;
+    push({ key: 'fund-overspent', level: 'high', count: balance < 0 ? 1 : 0, title: `Business fund is overspent by ${money(-balance)}`, detail: 'Payments were made from the fund but not enough was deposited. Add the deposit (Partners → Add entry) or mark those payments "Own pocket".', to: '/admin/finance/partners', action: 'Open Partners' });
+  }
 
   // ---- supplier purchases ----------------------------------------------------------------------
   const pu: any[] = purchases.data || [];

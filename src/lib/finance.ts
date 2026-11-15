@@ -16,14 +16,29 @@ export const isStockExpense = (e: { category: string }) => e.category === STOCK_
 
 export type Expense = {
   id: string; expense_date: string; category: string; description: string | null; amount: number;
-  paid_to: string | null; payment_method: string | null; reference: string | null; paid_by?: string | null;
+  paid_to: string | null; payment_method: string | null; reference: string | null; paid_by?: string | null; paid_from?: string | null;
   invoice_path?: string | null; invoice_name?: string | null;
 };
 export type PartnerTx = { id: string; tx_date: string; partner: string; kind: 'contribution' | 'withdrawal'; amount: number; note: string | null };
 export type OrderCost = { order_id: string; delivery_cost: number; payment_fee: number; received_by?: string | null; received_at?: string | null };
-export type PurchasePayment = { id: string; purchase_id: string; pay_date: string; amount: number; paid_by: string | null; method: string | null; reference: string | null; note: string | null };
-export type Refund = { id: string; order_id: string; refund_date: string; amount: number; refunded_by: string | null; method: string | null; reason: string | null };
+export type PurchasePayment = { id: string; purchase_id: string; pay_date: string; amount: number; paid_by: string | null; paid_from?: string | null; method: string | null; reference: string | null; note: string | null };
+export type Refund = { id: string; order_id: string; refund_date: string; amount: number; refunded_by: string | null; paid_from?: string | null; method: string | null; reason: string | null };
 export type ItemCost = { order_item_id: string; unit_cost: number };
+
+/** True when a payment came out of the business fund (not a partner's own pocket). */
+export const fromFund = (x: { paid_from?: string | null }) => x.paid_from === 'fund';
+
+/**
+ * The business fund: partners deposit money (contributions), the fund pays expenses, supplier payments and refunds,
+ * and withdrawals take money back out. Anything paid from a partner's own pocket never touches the fund.
+ */
+export const computeFund = (txs: PartnerTx[], expenses: Expense[], payments: PurchasePayment[], refunds: Refund[]) => {
+  const sum = (a: { amount: number }[]) => a.reduce((s, x) => s + Number(x.amount), 0);
+  const deposits = sum(txs.filter(t => t.kind === 'contribution'));
+  const withdrawals = sum(txs.filter(t => t.kind === 'withdrawal'));
+  const spent = sum(expenses.filter(fromFund)) + sum(payments.filter(fromFund)) + sum(refunds.filter(fromFund));
+  return { deposits, withdrawals, spent, balance: deposits - withdrawals - spent };
+};
 
 // ---- Sri Lanka time (UTC+5:30, no daylight saving) ----------------------------------------------
 // Months and date ranges must follow the shop's clock, not UTC, or late-night orders land in the wrong month.

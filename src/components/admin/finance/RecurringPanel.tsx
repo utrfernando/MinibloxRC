@@ -41,7 +41,7 @@ export const RecurringPanel: React.FC<{ items: Recurring[]; money: (n: number) =
         const date = `${month}-${String(r.day_of_month).padStart(2, '0')}`;
         const { error: e } = await supabase.from('expenses').insert({
           expense_date: date, category: r.category, description: r.description ? `${r.description} (recurring)` : 'Recurring', amount: r.amount,
-          paid_by: r.paid_by, paid_to: r.paid_to, payment_method: r.payment_method, created_by: user?.id,
+          paid_by: r.paid_by, paid_from: 'fund', paid_to: r.paid_to, payment_method: r.payment_method, created_by: user?.id,
         });
         if (e) throw e;
         await supabase.from('recurring_expenses').update({ last_generated: month }).eq('id', r.id);

@@ -154,12 +154,12 @@ const OrderModal: React.FC<{ order: Order | null; onClose: () => void; onStatus:
   const [receivedBy, setReceivedBy] = useState('');
   const [receivedAt, setReceivedAt] = useState<string | null>(null);
   const [refunds, setRefunds] = useState<Refund[]>([]);
-  const [rf, setRf] = useState({ amount: '', by: '', reason: '' });
+  const [rf, setRf] = useState({ amount: '', by: '', reason: '', from: 'fund' });
   const { user } = useAuth();
 
   useEffect(() => { setTracking(order?.tracking_number || ''); }, [order]);
   useEffect(() => {
-    setDelivery(''); setFee(''); setReceivedBy(''); setReceivedAt(null); setRefunds([]); setRf({ amount: '', by: '', reason: '' });
+    setDelivery(''); setFee(''); setReceivedBy(''); setReceivedAt(null); setRefunds([]); setRf({ amount: '', by: '', reason: '', from: 'fund' });
     if (!order) return;
     supabase.from('order_costs').select('*').eq('order_id', order.id).maybeSingle().then(({ data, error: e }) => {
       setCostsReady(!e);
@@ -178,9 +178,9 @@ const OrderModal: React.FC<{ order: Order | null; onClose: () => void; onStatus:
     const amount = Number(rf.amount);
     if (!(amount > 0)) return error('Enter the refund amount.');
     if (!rf.by) return error('Choose which partner handed the money back.');
-    const { error: e } = await supabase.from('order_refunds').insert({ order_id: order.id, amount, refunded_by: rf.by, reason: rf.reason || null, created_by: user?.id });
+    const { error: e } = await supabase.from('order_refunds').insert({ order_id: order.id, amount, refunded_by: rf.by, paid_from: rf.from, reason: rf.reason || null, created_by: user?.id });
     if (e) return error(/order_refunds/.test(e.message) ? 'Run migration 0013 in Supabase first (refunds table is missing).' : e.message);
-    success('Refund recorded'); setRf({ amount: '', by: '', reason: '' }); loadRefunds(order.id);
+    success('Refund recorded'); setRf({ amount: '', by: '', reason: '', from: 'fund' }); loadRefunds(order.id);
   };
   const removeRefund = async (r: Refund) => {
     if (!confirm('Delete this refund entry?')) return;
@@ -301,8 +301,9 @@ const OrderModal: React.FC<{ order: Order | null; onClose: () => void; onStatus:
             ))}
             <div className="grid grid-cols-2 gap-2 mt-2">
               <Input type="number" min="0" step="0.01" placeholder="Amount" value={rf.amount} onChange={e => setRf({ ...rf, amount: e.target.value })} className="!py-2 text-sm" />
-              <Select value={rf.by} onChange={e => setRf({ ...rf, by: e.target.value })} className="!py-2 text-sm"><option value="">Paid by…</option>{PARTNERS.map(p => <option key={p}>{p}</option>)}</Select>
+              <Select value={rf.by} onChange={e => setRf({ ...rf, by: e.target.value })} className="!py-2 text-sm"><option value="">Done by…</option>{PARTNERS.map(p => <option key={p}>{p}</option>)}</Select>
             </div>
+            <Select value={rf.from} onChange={e => setRf({ ...rf, from: e.target.value })} className="!py-2 text-sm mt-2"><option value="fund">From the business fund</option><option value="own">From own pocket</option></Select>
             <Input placeholder="Reason (optional)" value={rf.reason} onChange={e => setRf({ ...rf, reason: e.target.value })} className="!py-2 text-sm mt-2" />
             <Button size="sm" variant="secondary" className="mt-2 w-full" onClick={addRefund}>Add refund</Button>
             <p className="text-[11px] text-ink-400 mt-2">If you also mark the order Cancelled/Returned, it is already removed from sales — the refund then only moves cash, not profit.</p>

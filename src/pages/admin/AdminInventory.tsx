@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, ArrowUpFromLine, Package, Truck } from 'lucide-react';
 import { InvoiceControl } from '../../components/admin/InvoiceControl';
 import { PARTNERS, IMPORT_CATEGORY } from '../../lib/finance';
+import { PaidFromSelect } from '../../components/admin/finance/PaidFromSelect';
 import { useNavigate } from 'react-router-dom';
 import { useAdminSub } from '../../lib/adminRoute';
 import { EditPurchaseModal } from '../../components/admin/EditPurchaseModal';
@@ -237,6 +238,7 @@ const PurchaseModal: React.FC<{ open: boolean; onClose: () => void; products: Pr
   const [notes, setNotes] = useState('');
   const [paidNow, setPaidNow] = useState('');
   const [paidBy, setPaidBy] = useState('');
+  const [payFrom, setPayFrom] = useState('fund');
   const [payMethod, setPayMethod] = useState('bank');
   const [importCost, setImportCost] = useState('');
   const [importPaidBy, setImportPaidBy] = useState('');
@@ -266,14 +268,14 @@ const PurchaseModal: React.FC<{ open: boolean; onClose: () => void; products: Pr
 
     // Supplier payment (who paid is kept, so the Partners tab credits them)
     if (paid > 0) {
-      const { error: pe } = await supabase.from('purchase_payments').insert({ purchase_id: purchase.id, pay_date: date, amount: paid, paid_by: paidBy, method: payMethod, reference: reference.trim(), created_by: userId });
+      const { error: pe } = await supabase.from('purchase_payments').insert({ purchase_id: purchase.id, pay_date: date, amount: paid, paid_by: paidBy, paid_from: payFrom, method: payMethod, reference: reference.trim(), created_by: userId });
       if (pe) error('Purchase saved, but the payment was not recorded: ' + pe.message);
     }
     // Freight / customs: money out (credited to the partner) AND added into each product's landed cost.
     if (extra > 0) {
       const { error: xe } = await supabase.from('expenses').insert({
         expense_date: date, category: IMPORT_CATEGORY, description: `Freight/customs for ${reference || 'purchase'}`, amount: extra,
-        paid_by: importPaidBy, payment_method: payMethod, reference: reference || null, created_by: userId,
+        paid_by: importPaidBy, paid_from: payFrom, payment_method: payMethod, reference: reference || null, created_by: userId,
       });
       if (xe) error('Purchase saved, but the freight expense was not recorded: ' + xe.message);
     }
@@ -334,12 +336,13 @@ const PurchaseModal: React.FC<{ open: boolean; onClose: () => void; products: Pr
         </div></div>
         <div className="grid sm:grid-cols-3 gap-4 rounded-3xl bg-cream-100 p-4">
           <Field label="Paid to supplier now" hint="Leave empty if unpaid"><Input type="number" min="0" step="0.01" value={paidNow} onChange={e => setPaidNow(e.target.value)} placeholder="0.00" /></Field>
-          <Field label="Paid by (own pocket)"><Select value={paidBy} onChange={e => setPaidBy(e.target.value)}><option value="">Select…</option>{PARTNERS.map(p => <option key={p}>{p}</option>)}</Select></Field>
+          <Field label="Done by (who paid)"><Select value={paidBy} onChange={e => setPaidBy(e.target.value)}><option value="">Select…</option>{PARTNERS.map(p => <option key={p}>{p}</option>)}</Select></Field>
+          <PaidFromSelect value={payFrom} onChange={setPayFrom} label="Paid from (supplier + freight)" />
           <Field label="Method"><Select value={payMethod} onChange={e => setPayMethod(e.target.value)}><option value="bank">Bank transfer</option><option value="cash">Cash</option><option value="card">Card</option><option value="other">Other</option></Select></Field>
         </div>
         <div className="grid sm:grid-cols-3 gap-4 rounded-3xl bg-cream-100 p-4">
           <Field label="Freight + customs for this shipment" hint="Spread into each product's cost price"><Input type="number" min="0" step="0.01" value={importCost} onChange={e => setImportCost(e.target.value)} placeholder="0.00" /></Field>
-          <Field label="Freight paid by"><Select value={importPaidBy} onChange={e => setImportPaidBy(e.target.value)}><option value="">Select…</option>{PARTNERS.map(p => <option key={p}>{p}</option>)}</Select></Field>
+          <Field label="Freight done by"><Select value={importPaidBy} onChange={e => setImportPaidBy(e.target.value)}><option value="">Select…</option>{PARTNERS.map(p => <option key={p}>{p}</option>)}</Select></Field>
           <p className="text-xs font-semibold text-ink-500 self-end pb-2">Saved as an "{IMPORT_CATEGORY}" expense for the partner, and added to landed cost — so it is not counted twice in profit.</p>
         </div>
         <Field label="Notes"><Textarea value={notes} onChange={e => setNotes(e.target.value)} className="min-h-[60px]" /></Field>

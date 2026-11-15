@@ -12,7 +12,8 @@ import { AdminHeader, StatCard, Table, Td } from '../../components/admin/ui';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Input, Select, Field } from '../../components/ui/Input';
-import { PARTNERS, EXPENSE_CATEGORIES, STOCK_CATEGORY, IMPORT_CATEGORY, isStockExpense, lkDate, toYmd, lineCost, type Expense, type PartnerTx, type OrderCost, type Budget, type Recurring, type Lock, type PurchasePayment, type Refund, type ItemCost } from '../../lib/finance';
+import { PaidFromSelect } from '../../components/admin/finance/PaidFromSelect';
+import { computeFund, fromFund, PARTNERS, EXPENSE_CATEGORIES, STOCK_CATEGORY, IMPORT_CATEGORY, isStockExpense, lkDate, toYmd, lineCost, type Expense, type PartnerTx, type OrderCost, type Budget, type Recurring, type Lock, type PurchasePayment, type Refund, type ItemCost } from '../../lib/finance';
 import { PartnersPanel } from '../../components/admin/finance/PartnersPanel';
 import { BudgetsPanel } from '../../components/admin/finance/BudgetsPanel';
 import { RecurringPanel } from '../../components/admin/finance/RecurringPanel';
@@ -47,7 +48,7 @@ const download = (name: string, rows: (string | number)[][]) => {
   a.download = name; a.click(); URL.revokeObjectURL(a.href);
 };
 
-const blank = { expense_date: new Date().toISOString().slice(0, 10), category: EXPENSE_CATEGORIES[0], description: '', amount: '', paid_by: '', paid_to: '', payment_method: 'cash', reference: '' };
+const blank = { expense_date: new Date().toISOString().slice(0, 10), category: EXPENSE_CATEGORIES[0], description: '', amount: '', paid_by: '', paid_from: 'fund', paid_to: '', payment_method: 'cash', reference: '' };
 
 const AdminFinance: React.FC = () => {
   const { currency } = useSettings();
@@ -161,6 +162,9 @@ const AdminFinance: React.FC = () => {
     return { valid, revenue, revenueNet, refundTotal, refundProfit, collected, outstanding, cogs, exp, expenseTotal, stockExpenseTotal, paidTotal, purchaseSpend, gross, net, inventoryValue, margin, orderCostTotal, owedSuppliers };
   }, [orders, products, expenses, purchases, orderCosts, refunds, itemCosts, range]);
 
+  // the business fund: deposits in, payments out
+  const fund = useMemo(() => computeFund(txs, expenses, purchasePayments, refunds), [txs, expenses, purchasePayments, refunds]);
+
   // how many products each supplier provides (from the product cost records)
   const productCounts = useMemo(() => {
     const m: Record<string, number> = {};
@@ -217,7 +221,7 @@ const AdminFinance: React.FC = () => {
   const openNew = () => { setEditId(null); setForm(blank); setFile(null); setFormOpen(true); };
   const openEdit = (x: Expense) => {
     setEditId(x.id); setFile(null);
-    setForm({ expense_date: x.expense_date, category: x.category, description: x.description || '', amount: String(x.amount), paid_by: x.paid_by || '', paid_to: x.paid_to || '', payment_method: x.payment_method || 'cash', reference: x.reference || '' });
+    setForm({ expense_date: x.expense_date, category: x.category, description: x.description || '', amount: String(x.amount), paid_by: x.paid_by || '', paid_from: x.paid_from || 'own', paid_to: x.paid_to || '', payment_method: x.payment_method || 'cash', reference: x.reference || '' });
     setFormOpen(true);
   };
 
@@ -229,7 +233,7 @@ const AdminFinance: React.FC = () => {
     try {
       const row: Record<string, unknown> = {
         expense_date: form.expense_date, category: form.category, description: form.description || null, amount,
-        paid_by: form.paid_by, paid_to: form.paid_to || null, payment_method: form.payment_method || null, reference: form.reference || null,
+        paid_by: form.paid_by, paid_from: form.paid_from, paid_to: form.paid_to || null, payment_method: form.payment_method || null, reference: form.reference || null,
       };
       if (file) { const up = await uploadInvoice(file, 'expenses'); row.invoice_path = up.path; row.invoice_name = up.name; }
       if (editId) {
@@ -302,6 +306,7 @@ const AdminFinance: React.FC = () => {
           <StatCard label="Goods for resale" value={money(f.purchaseSpend)} icon={<Truck size={20} />} tone="ink" hint={f.stockExpenseTotal > 0 ? `Includes ${money(f.stockExpenseTotal)} entered as expenses` : 'Goods bought for resale'} />
           <StatCard label="Inventory value" value={money(f.inventoryValue)} icon={<Boxes size={20} />} tone="lavender" hint="Stock on hand at cost" />
           <StatCard label="Delivery & fees" value={money(f.orderCostTotal)} icon={<Truck size={20} />} tone="peach" hint="Costs entered on orders" />
+          <StatCard label="Business fund" value={money(fund.balance)} icon={<Wallet size={20} />} tone={fund.balance >= 0 ? 'mint' : 'red'} hint={`${money(fund.deposits)} deposited · ${money(fund.spent)} paid out`} />
           <StatCard label="Owed to suppliers" value={money(f.owedSuppliers)} icon={<Wallet size={20} />} tone={f.owedSuppliers > 0 ? 'red' : 'mint'} hint="Unpaid purchases" />
         </div>
 
@@ -347,7 +352,7 @@ const AdminFinance: React.FC = () => {
               <Td className="text-xs text-ink-500">{formatDate(e.expense_date)}</Td>
               <Td className="font-bold text-ink-800">{e.category}</Td>
               <Td className="text-ink-600">{e.description || '—'}</Td>
-              <Td>{e.paid_by ? <span className="inline-block rounded-full bg-lavender-50 text-lavender-600 px-2.5 py-0.5 text-xs font-extrabold">{e.paid_by}</span> : <span className="text-ink-400">—</span>}</Td>
+              <Td>{e.paid_by ? <span className="inline-block rounded-full bg-lavender-50 text-lavender-600 px-2.5 py-0.5 text-xs font-extrabold">{e.paid_by}</span> : <span className="text-ink-400">—</span>}{fromFund(e) && <span className="block mt-0.5 text-[10px] font-bold text-mint-700">from fund</span>}</Td>
               <Td className="text-ink-600">{e.paid_to || '—'}</Td>
               <Td className="text-xs text-ink-500">{e.reference || '—'}</Td>
               <Td><InvoiceControl table="expenses" id={e.id} path={e.invoice_path} name={e.invoice_name} onChanged={load} /></Td>
@@ -383,8 +388,12 @@ const AdminFinance: React.FC = () => {
                 : 'Freight / customs on a shipment. Easier: enter it inside Inventory → Purchases, where it is spread into each product\'s cost price automatically.'}
             </p>
           )}
+          <PaidFromSelect value={form.paid_from} onChange={v => setForm({ ...form, paid_from: v })} />
+          {form.paid_from === 'fund' && Number(form.amount) > fund.balance + (editId ? Number(expenses.find(x => x.id === editId)?.paid_from === 'fund' ? expenses.find(x => x.id === editId)?.amount : 0) : 0) && (
+            <p className="sm:col-span-2 rounded-2xl bg-red-50 border border-red-200 px-3 py-2 text-xs font-bold text-red-600">The business fund only has {money(Math.max(0, fund.balance))}. Add a deposit first (Finance → Partners → Add entry), or choose "Own pocket".</p>
+          )}
           <Field label="Payment method"><Select value={form.payment_method} onChange={e => setForm({ ...form, payment_method: e.target.value })}><option value="cash">Cash</option><option value="bank">Bank transfer</option><option value="card">Card</option><option value="other">Other</option></Select></Field>
-          <Field label="Paid by (who spent it)"><Select value={form.paid_by} onChange={e => setForm({ ...form, paid_by: e.target.value })}><option value="">Select person…</option>{PARTNERS.map(p => <option key={p} value={p}>{p}</option>)}</Select></Field>
+          <Field label="Done by (who made the payment)"><Select value={form.paid_by} onChange={e => setForm({ ...form, paid_by: e.target.value })}><option value="">Select person…</option>{PARTNERS.map(p => <option key={p} value={p}>{p}</option>)}</Select></Field>
           <Field label="Paid to"><Input value={form.paid_to} onChange={e => setForm({ ...form, paid_to: e.target.value })} /></Field>
           <Field label="Receipt / invoice no."><Input value={form.reference} onChange={e => setForm({ ...form, reference: e.target.value })} /></Field>
           <div className="sm:col-span-2">
