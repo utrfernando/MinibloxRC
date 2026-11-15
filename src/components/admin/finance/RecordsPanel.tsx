@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Lock, Unlock, FileSpreadsheet, DatabaseBackup, History } from 'lucide-react';
 import { supabase, formatDate, type Order, type Product } from '../../../lib/supabase';
-import { PARTNERS, downloadWorkbook, fetchAll, monthKey, type Expense, type Lock as LockRow, type OrderCost, type PartnerTx } from '../../../lib/finance';
+import { PARTNERS, isStockExpense, downloadWorkbook, fetchAll, monthKey, type Expense, type Lock as LockRow, type OrderCost, type PartnerTx } from '../../../lib/finance';
 import { useToast } from '../../../contexts/ToastContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Button } from '../../ui/Button';
@@ -75,11 +75,12 @@ export const RecordsPanel: React.FC<Props> = ({ locks, orders, products, expense
       revenue += Number(o.total_amount); cogs += c; extra += x;
       return { Order: o.order_number, Date: o.placed_at.slice(0, 10), Customer: o.customer_name, Status: o.status, Payment: o.payment_status, Total: Number(o.total_amount), 'Product cost': c, 'Delivery + fees': x, Profit: Number(o.total_amount) - c - x };
     });
-    const expTotal = exp.reduce((s, e) => s + Number(e.amount), 0);
+    const expTotal = exp.filter(e => !isStockExpense(e)).reduce((s, e) => s + Number(e.amount), 0); // running costs only
+    const stockBought = exp.filter(isStockExpense).reduce((s, e) => s + Number(e.amount), 0);
     const summary: Record<string, unknown>[] = [
       { Item: 'Month', Value: month },
       { Item: 'Revenue', Value: revenue }, { Item: 'Product cost (COGS)', Value: cogs }, { Item: 'Delivery + payment fees', Value: extra },
-      { Item: 'Gross profit', Value: revenue - cogs - extra }, { Item: 'Expenses', Value: expTotal }, { Item: 'Net profit', Value: revenue - cogs - extra - expTotal },
+      { Item: 'Gross profit', Value: revenue - cogs - extra }, { Item: 'Running expenses', Value: expTotal }, { Item: 'Stock purchases (not in profit)', Value: stockBought }, { Item: 'Net profit', Value: revenue - cogs - extra - expTotal },
       { Item: 'Owed to suppliers (all time)', Value: purchases.reduce((s, p) => s + owedOn(p), 0) },
       ...PARTNERS.flatMap(p => [
         { Item: `${p} — expenses paid`, Value: exp.filter(e => e.paid_by === p).reduce((s, e) => s + Number(e.amount), 0) },

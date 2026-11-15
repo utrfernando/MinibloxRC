@@ -10,7 +10,7 @@ import { AdminHeader, StatCard, Table, Td } from '../../components/admin/ui';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Input, Select, Field } from '../../components/ui/Input';
-import { PARTNERS, EXPENSE_CATEGORIES, type Expense, type PartnerTx, type OrderCost, type Budget, type Recurring, type Lock } from '../../lib/finance';
+import { PARTNERS, EXPENSE_CATEGORIES, isStockExpense, type Expense, type PartnerTx, type OrderCost, type Budget, type Recurring, type Lock } from '../../lib/finance';
 import { PartnersPanel } from '../../components/admin/finance/PartnersPanel';
 import { BudgetsPanel } from '../../components/admin/finance/BudgetsPanel';
 import { RecurringPanel } from '../../components/admin/finance/RecurringPanel';
@@ -116,8 +116,12 @@ const AdminFinance: React.FC = () => {
       return a + Number(p?.landed_cost || p?.supplier_cost || 0) * i.quantity;
     }, 0), 0);
     const exp = expenses.filter(e => inRange(e.expense_date));
-    const expenseTotal = exp.reduce((s, e) => s + Number(e.amount), 0);
-    const purchaseSpend = purchases.filter(p => inRange(p.purchase_date)).reduce((s, p) => s + Number(p.total_cost), 0);
+    // Running costs reduce profit. Stock purchases are tracked separately: their cost reaches profit through
+    // the cost price of items when they are sold, so counting them here too would double-count.
+    const expenseTotal = exp.filter(e => !isStockExpense(e)).reduce((s, e) => s + Number(e.amount), 0);
+    const stockExpenseTotal = exp.filter(isStockExpense).reduce((s, e) => s + Number(e.amount), 0);
+    const paidTotal = exp.reduce((s, e) => s + Number(e.amount), 0);
+    const purchaseSpend = purchases.filter(p => inRange(p.purchase_date)).reduce((s, p) => s + Number(p.total_cost), 0) + stockExpenseTotal;
     const costMap = new Map(orderCosts.map(c => [c.order_id, c]));
     const orderCostTotal = valid.reduce((s, o) => s + Number(costMap.get(o.id)?.delivery_cost || 0) + Number(costMap.get(o.id)?.payment_fee || 0), 0);
     const owedSuppliers = purchases.reduce((s, p) => s + owedOn(p), 0);
@@ -125,7 +129,7 @@ const AdminFinance: React.FC = () => {
     const net = gross - orderCostTotal - expenseTotal;
     const inventoryValue = products.reduce((s, p) => s + Number(p.landed_cost || p.supplier_cost || 0) * p.stock_quantity, 0);
     const margin = revenue > 0 ? (net / revenue) * 100 : 0;
-    return { valid, revenue, collected, outstanding, cogs, exp, expenseTotal, purchaseSpend, gross, net, inventoryValue, margin, orderCostTotal, owedSuppliers };
+    return { valid, revenue, collected, outstanding, cogs, exp, expenseTotal, stockExpenseTotal, paidTotal, purchaseSpend, gross, net, inventoryValue, margin, orderCostTotal, owedSuppliers };
   }, [orders, products, expenses, purchases, orderCosts, range]);
 
   const monthly = useMemo(() => {
@@ -139,13 +143,13 @@ const AdminFinance: React.FC = () => {
       const oc = orderCosts.find(c => c.order_id === o.id);
       r.Costs += Number(oc?.delivery_cost || 0) + Number(oc?.payment_fee || 0);
     });
-    expenses.filter(e => inRange(e.expense_date)).forEach(e => { row(e.expense_date).Costs += Number(e.amount); });
+    expenses.filter(e => inRange(e.expense_date) && !isStockExpense(e)).forEach(e => { row(e.expense_date).Costs += Number(e.amount); });
     return [...m.values()].sort((a, b) => a.month.localeCompare(b.month)).map(r => ({ ...r, Revenue: Math.round(r.Revenue), Costs: Math.round(r.Costs), Profit: Math.round(r.Revenue - r.Costs) }));
   }, [orders, products, expenses, orderCosts, range]);
 
   const byCategory = useMemo(() => {
     const m = new Map<string, number>();
-    f.exp.forEach(e => m.set(e.category, (m.get(e.category) || 0) + Number(e.amount)));
+    f.exp.filter(e => !isStockExpense(e)).forEach(e => m.set(e.category, (m.get(e.category) || 0) + Number(e.amount)));
     return [...m.entries()].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
   }, [f.exp]);
 
@@ -239,11 +243,11 @@ const AdminFinance: React.FC = () => {
         <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
           <StatCard label="Revenue" value={money(f.revenue)} icon={<Banknote size={20} />} tone="mint" hint={`${f.valid.length} orders`} />
           <StatCard label="Gross profit" value={money(f.gross)} icon={<TrendingUp size={20} />} tone="lavender" hint={`Cost of goods ${money(f.cogs)}`} />
-          <StatCard label="Expenses" value={money(f.expenseTotal)} icon={<Receipt size={20} />} tone="peach" hint={`${f.exp.length} entries`} />
+          <StatCard label="Running expenses" value={money(f.expenseTotal)} icon={<Receipt size={20} />} tone="peach" hint="Reduce profit (excludes stock purchases)" />
           <StatCard label="Net profit" value={money(f.net)} icon={<Wallet size={20} />} tone={f.net >= 0 ? 'mint' : 'red'} hint={`${f.margin.toFixed(1)}% margin`} />
           <StatCard label="Cash collected" value={money(f.collected)} icon={<Banknote size={20} />} tone="mint" hint="Orders marked paid" />
           <StatCard label="Outstanding" value={money(f.outstanding)} icon={<AlertTriangle size={20} />} tone="sunshine" hint="Unpaid / COD pending" />
-          <StatCard label="Stock purchases" value={money(f.purchaseSpend)} icon={<Truck size={20} />} tone="ink" hint="From supplier purchases" />
+          <StatCard label="Stock purchases" value={money(f.purchaseSpend)} icon={<Truck size={20} />} tone="ink" hint={f.stockExpenseTotal > 0 ? `Includes ${money(f.stockExpenseTotal)} entered as expenses` : 'Goods bought for resale'} />
           <StatCard label="Inventory value" value={money(f.inventoryValue)} icon={<Boxes size={20} />} tone="lavender" hint="Stock on hand at cost" />
           <StatCard label="Delivery & fees" value={money(f.orderCostTotal)} icon={<Truck size={20} />} tone="peach" hint="Costs entered on orders" />
           <StatCard label="Owed to suppliers" value={money(f.owedSuppliers)} icon={<Wallet size={20} />} tone={f.owedSuppliers > 0 ? 'red' : 'mint'} hint="Unpaid purchases" />
@@ -278,7 +282,7 @@ const AdminFinance: React.FC = () => {
           <Button variant="ghost" size="sm" onClick={exportExpenses} disabled={!f.exp.length}><Download size={14} /> Export CSV</Button>
         </div>
         <div className="flex flex-wrap gap-2 mb-3">
-          {[['all', 'Everyone', f.expenseTotal], ...PARTNERS.map(p => [p, p, byPerson[p]]), ...(byPerson.Unassigned ? [['Unassigned', 'Unassigned', byPerson.Unassigned]] : [])].map(([k, label, amt]) => (
+          {[['all', 'Everyone', f.paidTotal], ...PARTNERS.map(p => [p, p, byPerson[p]]), ...(byPerson.Unassigned ? [['Unassigned', 'Unassigned', byPerson.Unassigned]] : [])].map(([k, label, amt]) => (
             <button key={k as string} onClick={() => setWho(k as string)} className={`rounded-full px-4 py-1.5 text-xs font-extrabold border transition ${who === k ? 'bg-mint-500 border-mint-500 text-white' : 'bg-white border-ink-200 text-ink-600 hover:border-mint-400'}`}>
               {label as string}: {money(Number(amt))}
             </button>

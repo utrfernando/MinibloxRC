@@ -2,7 +2,13 @@ import * as XLSX from 'xlsx';
 import { supabase, formatCurrency, formatDate, type Order } from './supabase';
 
 export const PARTNERS = ['Davide', 'Randima'];
-export const EXPENSE_CATEGORIES = ['Shipping & delivery', 'Packaging', 'Advertising', 'Salaries & wages', 'Rent', 'Utilities', 'Platform & payment fees', 'Software & tools', 'Taxes & licences', 'Other'];
+/** Money spent on goods for resale. Not a running cost: its cost reaches profit when the item is sold. */
+export const STOCK_CATEGORY = 'Stock purchase';
+export const EXPENSE_CATEGORIES = ['Shipping & delivery', STOCK_CATEGORY, 'Packaging', 'Advertising', 'Salaries & wages', 'Rent', 'Utilities', 'Platform & payment fees', 'Software & tools', 'Taxes & licences', 'Other'];
+
+/** Categories that count as running costs (everything except stock purchases). */
+export const OPERATING_CATEGORIES = EXPENSE_CATEGORIES.filter(c => c !== STOCK_CATEGORY);
+export const isStockExpense = (e: { category: string }) => e.category === STOCK_CATEGORY;
 
 export type Expense = {
   id: string; expense_date: string; category: string; description: string | null; amount: number;

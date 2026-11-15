@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
-import { EXPENSE_CATEGORIES, monthKey, type Budget, type Expense } from '../../../lib/finance';
+import { OPERATING_CATEGORIES as EXPENSE_CATEGORIES, monthKey, type Budget, type Expense } from '../../../lib/finance';
 import { useToast } from '../../../contexts/ToastContext';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
