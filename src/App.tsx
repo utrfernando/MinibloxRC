@@ -1,4 +1,5 @@
 import React, { Suspense, lazy } from 'react';
+import { AppGuard } from './components/AppGuard';
 import { BrowserRouter as Router, Routes, Route, Navigate, useParams, Link } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { CartProvider } from './contexts/CartContext';
@@ -102,6 +103,7 @@ const App: React.FC = () => {
           <ToastProvider>
             <ConfirmProvider>
             <Router>
+              <AppGuard>
               <Suspense fallback={<PageLoading />}>
               <Routes>
                 <Route element={<StoreLayout />}>
@@ -143,6 +145,7 @@ const App: React.FC = () => {
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
               </Suspense>
+              </AppGuard>
             </Router>
           </ConfirmProvider>
           </ToastProvider>
