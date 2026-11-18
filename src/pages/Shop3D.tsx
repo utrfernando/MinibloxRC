@@ -42,7 +42,8 @@ function loadSmall(url: string, cb: (t: THREE.Texture) => void) {
 }
 
 function hasWebGL() {
-  try { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); } catch { return false; }
+  // this version of three.js needs WebGL 2
+  try { const c = document.createElement('canvas'); return !!c.getContext('webgl2'); } catch { return false; }
 }
 
 /** Small canvas-drawn textures so we need no image or font files. */
@@ -97,7 +98,8 @@ const Confetti: React.FC<{ width: number }> = ({ width }) => {
 
 const Sign: React.FC<{ x: number }> = ({ x }) => {
   const tex = useCanvasTexture((g, w, h) => {
-    g.fillStyle = '#14b8a6'; g.beginPath(); g.roundRect(6, 6, w - 12, h - 12, 40); g.fill();
+    g.fillStyle = '#14b8a6'; const x0 = 6, y0 = 6, rw = w - 12, rh = h - 12, rr = 40;   // rounded box, drawn by hand (older phones lack roundRect)
+    g.beginPath(); g.moveTo(x0 + rr, y0); g.arcTo(x0 + rw, y0, x0 + rw, y0 + rh, rr); g.arcTo(x0 + rw, y0 + rh, x0, y0 + rh, rr); g.arcTo(x0, y0 + rh, x0, y0, rr); g.arcTo(x0, y0, x0 + rw, y0, rr); g.closePath(); g.fill();
     g.lineWidth = 10; g.strokeStyle = '#fff'; g.stroke();
     g.fillStyle = '#fff'; g.font = '800 92px "Baloo 2", "Fredoka", "Segoe UI", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText('MinibloxRC ★', w / 2, h / 2 - 14);
@@ -232,6 +234,22 @@ const Scene = React.memo<{ items: Placed[]; cols: number; target: React.MutableR
   );
 });
 
+class Guard extends React.Component<{ children: React.ReactNode }, { bad: boolean }> {
+  state = { bad: false };
+  static getDerivedStateFromError() { return { bad: true }; }
+  componentDidCatch(e: unknown) { console.error('Toy Town failed to start', e); }
+  render() {
+    if (!this.state.bad) return this.props.children;
+    return (
+      <div className="max-w-xl mx-auto px-4 py-20 text-center">
+        <h1 className="font-display text-3xl font-extrabold text-ink-900">Toy Town couldn&rsquo;t open on this device</h1>
+        <p className="mt-3 text-ink-500">Please use the normal shop instead — everything is there too.</p>
+        <Link to="/shop" className="mt-6 inline-flex rounded-full bg-mint-500 px-6 py-3 font-extrabold text-white">Go to the shop</Link>
+      </div>
+    );
+  }
+}
+
 /** A cute toon toy shop you can look around. Loaded only when the shopper opens /shop-3d. */
 const Shop3D: React.FC = () => {
   const { products, loading } = useProducts({ sort: 'newest' }, []);
@@ -331,4 +349,5 @@ const Shop3D: React.FC = () => {
   );
 };
 
-export default Shop3D;
+const Shop3DSafe: React.FC = () => <Guard><Shop3D /></Guard>;
+export default Shop3DSafe;
