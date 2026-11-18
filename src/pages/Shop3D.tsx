@@ -41,6 +41,9 @@ function loadSmall(url: string, cb: (t: THREE.Texture) => void) {
   pump();
 }
 
+/** Phones get a lighter scene: no confetti, fewer balloons, no edge smoothing, and only the shelves near you are drawn. */
+const LITE = typeof window !== 'undefined' && (window.matchMedia?.('(pointer: coarse)').matches || window.innerWidth < 820);
+
 function hasWebGL() {
   // this version of three.js needs WebGL 2
   try { const c = document.createElement('canvas'); return !!c.getContext('webgl2'); } catch { return false; }
@@ -209,7 +212,7 @@ const Rig: React.FC<{ target: React.MutableRefObject<number>; min: number; max: 
   return null;
 };
 
-const Scene = React.memo<{ items: Placed[]; cols: number; target: React.MutableRefObject<number>; selectedId: string | null; onPick: (p: Product, x: number) => void; onHover: (n: string | null) => void; intro: React.MutableRefObject<boolean> }>(({ items, cols, target, selectedId, onPick, onHover, intro }) => {
+const Scene = React.memo<{ items: Placed[]; cols: number; target: React.MutableRefObject<number>; selectedId: string | null; onPick: (p: Product, x: number) => void; onHover: (n: string | null) => void; intro: React.MutableRefObject<boolean>; view: number }>(({ items, cols, target, selectedId, onPick, onHover, intro, view }) => {
   const width = Math.max(cols * COL_W + 4, 12);
   const half = (cols * COL_W) / 2;
   return (
@@ -223,12 +226,12 @@ const Scene = React.memo<{ items: Placed[]; cols: number; target: React.MutableR
       <Wall width={width + 8} />
       <mesh position={[0, 0.5, -0.34]}><planeGeometry args={[width + 8, 1]} /><meshToonMaterial color="#5eead4" /></mesh>
       <Bunting width={width} />
-      <Confetti width={width} />
+      {!LITE && <Confetti width={width} />}
       <Awning width={width} />
       <Sign x={-half + 2.2} />
       <Shelves items={items} cols={cols} />
-      {items.map((it, i) => <Tile key={it.p.id} item={it} index={i} selected={selectedId === it.p.id} onPick={onPick} onHover={onHover} />)}
-      {Array.from({ length: Math.max(3, Math.floor(cols / 2)) }, (_, i) => <Balloon key={i} x={-half + 3 + i * 3.6} color={PASTELS[(i * 2 + 1) % PASTELS.length]} phase={i * 1.7} />)}
+      {items.map((it, i) => Math.abs(it.x - view) <= (LITE ? 5.2 : 9) && <Tile key={it.p.id} item={it} index={i} selected={selectedId === it.p.id} onPick={onPick} onHover={onHover} />)}
+      {Array.from({ length: LITE ? 3 : Math.max(3, Math.floor(cols / 2)) }, (_, i) => <Balloon key={i} x={-half + 3 + i * 3.6} color={PASTELS[(i * 2 + 1) % PASTELS.length]} phase={i * 1.7} />)}
       <Rig target={target} min={-half + 3} max={half - 3} intro={intro} />
     </>
   );
@@ -276,6 +279,8 @@ const Shop3D: React.FC = () => {
   const items: Placed[] = useMemo(() => list.map((p, i) => ({ p, x: (Math.floor(i / 3) - (cols - 1) / 2) * COL_W, y: TIER_Y[i % 3] })), [list, cols]);
 
   const onPick = useCallback((p: Product, x: number) => { setSelected(p); target.current = x; }, []);
+  const [view, setView] = useState(0);
+  useEffect(() => { const t = setInterval(() => { const v = Math.round(target.current / 1.7) * 1.7; setView(o => (Math.abs(o - v) < 0.1 ? o : v)); }, 250); return () => clearInterval(t); }, []);
   const move = (dx: number) => { target.current = THREE.MathUtils.clamp(target.current + dx, -half + 3, half - 3); };
   useEffect(() => {
     const k = (e: KeyboardEvent) => { if (e.key === 'ArrowRight') move(2.2); if (e.key === 'ArrowLeft') move(-2.2); if (e.key === 'Escape') setSelected(null); };
@@ -299,8 +304,8 @@ const Shop3D: React.FC = () => {
       onPointerUp={() => { drag.current = null; }}
       onWheel={e => move((Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) / 120)}
       style={{ touchAction: 'pan-y' }}>
-      <Canvas dpr={[1, window.innerWidth < 768 ? 1 : 1.5]} camera={{ position: [0, 3.2, 15], fov: 52 }} gl={{ antialias: true, powerPreference: 'low-power' }}>
-        <Scene intro={introRef} items={items} cols={cols} target={target} selectedId={selected?.id ?? null}
+      <Canvas dpr={LITE ? 1 : [1, 1.5]} camera={{ position: [0, 3.2, 15], fov: 52 }} gl={{ antialias: !LITE, powerPreference: 'low-power' }}>
+        <Scene view={view} intro={introRef} items={items} cols={cols} target={target} selectedId={selected?.id ?? null}
           onPick={onPick} onHover={setHoverName} />
       </Canvas>
 
