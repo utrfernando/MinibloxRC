@@ -118,10 +118,6 @@ const Header: React.FC = () => {
           </form>
 
           <div className="flex items-center gap-1 sm:gap-2 ml-auto">
-            <Link to="/shop-3d" aria-label="Toy Town, walk through our 3D shop" title="Walk through our 3D shop"
-              className="inline-flex items-center gap-1.5 rounded-full border-2 border-amber-300 bg-amber-50 px-2.5 sm:px-3.5 py-1.5 text-sm font-extrabold text-amber-700 hover:bg-amber-100 transition">
-              <span aria-hidden className="text-base leading-none">🧸</span><span className="hidden sm:inline">Toy Town</span>
-            </Link>
             <Link to="/wishlist" className="p-2.5 rounded-full hover:bg-mint-50 text-ink-700 transition" aria-label="Wishlist">
               <Heart size={22} />
             </Link>
@@ -214,7 +210,6 @@ const Header: React.FC = () => {
                     {l.label}
                   </NavLink>
                 ))}
-                <NavLink to="/shop-3d" onClick={() => setMobileOpen(false)} className="block px-4 py-3 rounded-2xl font-bold text-amber-700 bg-amber-50">🧸 Toy Town <span className="text-xs font-semibold text-amber-600">· walk through our 3D shop</span></NavLink>
                 <NavLink to="/about" onClick={() => setMobileOpen(false)} className="block px-4 py-3 rounded-2xl font-bold text-ink-800 hover:bg-mint-50">About Us</NavLink>
                 <NavLink to="/faq" onClick={() => setMobileOpen(false)} className="block px-4 py-3 rounded-2xl font-bold text-ink-800 hover:bg-mint-50">FAQ</NavLink>
                 <NavLink to="/contact" onClick={() => setMobileOpen(false)} className="block px-4 py-3 rounded-2xl font-bold text-ink-800 hover:bg-mint-50">Contact Us</NavLink>

@@ -10,28 +10,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script>
-      /* Safety net: if the app never draws (blank page), or the address has ?debug=1, show what went wrong. */
-      (function () {
-        var log = [];
-        function add(m) { log.push(String(m).slice(0, 200)); }
-        window.addEventListener('error', function (e) { add((e.message || 'error') + ' @' + String(e.filename || '').split('/').pop() + ':' + (e.lineno || '')); }, true);
-        window.addEventListener('unhandledrejection', function (e) { add('promise: ' + ((e.reason && e.reason.message) || e.reason)); });
-        function gl2() { try { return !!document.createElement('canvas').getContext('webgl2'); } catch (x) { return 'error'; } }
-        function show() {
-          var d = document.createElement('div');
-          d.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#111;color:#9f9;font:11px/1.35 monospace;padding:8px;max-height:45vh;overflow:auto;white-space:pre-wrap;word-break:break-word';
-          d.textContent = 'DEBUG
-' + navigator.userAgent + '
-webgl2: ' + gl2() + '  screen: ' + innerWidth + 'x' + innerHeight + '
-' + (log.length ? log.join('
-') : '(no errors recorded)');
-          document.body.appendChild(d);
-        }
-        var debug = /[?&]debug=1/.test(location.search);
-        setTimeout(function () { var r = document.getElementById('root'); if (debug || !r || !r.children.length) show(); }, debug ? 9000 : 7000);
-      })();
-    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

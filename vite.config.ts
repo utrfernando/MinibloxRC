@@ -12,7 +12,6 @@ export default defineConfig({
         manualChunks: (id) => {
           if (!id.includes('node_modules')) return;
           if (/node_modules\/(react|react-dom|scheduler|react-router|react-router-dom|@remix-run)\//.test(id)) return 'react';
-          if (/node_modules\/(three|@react-three)\//.test(id)) return 'three3d';
           if (id.includes('framer-motion') || id.includes('motion-dom') || id.includes('motion-utils')) return 'motion';
         },
       },

@@ -13,7 +13,6 @@ import Home from './pages/Home';
 const AdminLayout = lazy(() => import('./components/layout/AdminLayout'));
 const AccountLayout = lazy(() => import('./pages/account/AccountLayout'));
 const Shop = lazy(() => import('./pages/Shop'));
-const Shop3D = lazy(() => import('./pages/Shop3D'));
 const ProductDetails = lazy(() => import('./pages/ProductDetails'));
 const Cart = lazy(() => import('./pages/Cart'));
 const Checkout = lazy(() => import('./pages/Checkout'));
@@ -109,7 +108,6 @@ const App: React.FC = () => {
                 <Route element={<StoreLayout />}>
                   <Route path="/" element={<Home />} />
                   <Route path="/shop" element={<Shop />} />
-                  <Route path="/shop-3d" element={<Shop3D />} />
                   <Route path="/product/:id" element={<ProductDetails />} />
                   <Route path="/cart" element={<Cart />} />
                   <Route path="/checkout" element={<RequireAuth><Checkout /></RequireAuth>} />
