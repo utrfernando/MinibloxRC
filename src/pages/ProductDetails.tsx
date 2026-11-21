@@ -64,8 +64,8 @@ const ProductDetails: React.FC = () => {
   const stock = variant ? variant.stock_quantity : product.stock_quantity;
   const mainImg = (variant?.image_url && activeImg < 0 ? variant.image_url : null) || images[activeImg]?.url || primaryImage(product);
   const price = effectivePrice(product);
-  const outOfStock = stock <= 0;
-  const lowStock = stock > 0 && stock <= product.low_stock_threshold;
+  const outOfStock = stock <= 0 || !!product.sold_out_override;
+  const lowStock = !product.sold_out_override && stock > 0 && stock <= product.low_stock_threshold;
   const wishlisted = isWishlisted(product.id);
   const discountPct = hasDiscount(product) ? Math.round((1 - (product.discount_price as number) / product.selling_price) * 100) : 0;
 

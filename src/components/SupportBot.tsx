@@ -52,7 +52,7 @@ const SupportBot: React.FC = () => {
     setBusy(true);
     const words = q.split(' ').filter(Boolean).slice(0, 4);
     const safe = words.map(w => w.replace(/[%,()]/g, ''));
-    const { data } = await supabase.from('products').select('id,name,selling_price,discount_price,stock_quantity')
+    const { data } = await supabase.from('products').select('id,name,selling_price,discount_price,stock_quantity,sold_out_override')
       .eq('status', 'published').or(safe.flatMap(w => [`name.ilike.%${w}%`, `sku.ilike.%${w}%`]).join(',')).limit(40);
     setBusy(false);
     // rank by how many of the words appear in the name
@@ -61,7 +61,7 @@ const SupportBot: React.FC = () => {
     if (!ranked.length) { add({ from: 'bot', text: `I couldn't find "${q}". Try another word, or browse the shop.`, links: [{ label: 'Open shop', to: `/shop?q=${encodeURIComponent(q)}` }], chips: ['Talk to a person'] }); return; }
     ranked.forEach((p: any) => add({
       from: 'bot',
-      text: `🧱 ${p.name}\n${formatCurrency(unitPrice(p), currency)} · ${p.stock_quantity > 0 ? (p.stock_quantity <= 5 ? `only ${p.stock_quantity} left` : 'in stock') : 'out of stock'}`,
+      text: `🧱 ${p.name}\n${formatCurrency(unitPrice(p), currency)} · ${p.stock_quantity > 0 && !p.sold_out_override ? (p.stock_quantity <= 5 ? `only ${p.stock_quantity} left` : 'in stock') : 'out of stock'}`,
       links: [{ label: 'View product', to: `/product/${p.id}` }],
     }));
   };

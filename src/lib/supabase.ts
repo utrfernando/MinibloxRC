@@ -82,6 +82,7 @@ export type Product = {
   category?: Category | null;
   images?: ProductImage[];
   variants?: ProductVariant[];
+  sold_out_override?: boolean;
 };
 
 export type ProductImage = {
@@ -379,5 +380,8 @@ export async function openInvoice(path: string) {
 // A discount only counts when it is a real positive price below the selling price.
 export const hasDiscount = (p: { discount_price: number | null; selling_price: number }) =>
   p.discount_price != null && p.discount_price > 0 && p.discount_price < p.selling_price;
+/** True when customers should see this product as out of stock: none left, or the owner marked it so. */
+export const isSoldOut = (p: { stock_quantity: number; sold_out_override?: boolean }) => !!p.sold_out_override || p.stock_quantity <= 0;
+
 export const unitPrice = (p: { discount_price: number | null; selling_price: number }) =>
   hasDiscount(p) ? (p.discount_price as number) : p.selling_price;

@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Heart, ShoppingBag, Star } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { type Product, formatCurrency, hasDiscount, unitPrice } from '../lib/supabase';
+import { type Product, formatCurrency, hasDiscount, unitPrice, isSoldOut } from '../lib/supabase';
 import { useCart } from '../contexts/CartContext';
 import { useToast } from '../contexts/ToastContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -22,7 +22,7 @@ const ProductCard: React.FC<{ product: Product; index?: number }> = ({ product, 
   const { success } = useToast();
   const { currency } = useSettings();
   const wishlisted = isWishlisted(product.id);
-  const outOfStock = product.stock_quantity <= 0;
+  const outOfStock = isSoldOut(product);
   const navigate = useNavigate();
   const hasColours = (product.variants?.length || 0) > 0;
   const price = effectivePrice(product);

@@ -33,6 +33,7 @@ const schema = z.object({
   is_featured: z.boolean().optional(),
   is_best_seller: z.boolean().optional(),
   is_new: z.boolean().optional(),
+  sold_out_override: z.boolean().optional(),
   tags: z.string().optional(),
 });
 
@@ -72,7 +73,7 @@ const ProductForm: React.FC<Props> = ({ open, onClose, product, onSaved }) => {
         selling_price: Number(product.selling_price), discount_price: product.discount_price ? Number(product.discount_price) : '',
         stock_quantity: product.stock_quantity, low_stock_threshold: product.low_stock_threshold,
         status: product.status, is_featured: product.is_featured, is_best_seller: product.is_best_seller,
-        is_new: product.is_new, tags: (product.tags || []).join(', '),
+        is_new: product.is_new, sold_out_override: !!product.sold_out_override, tags: (product.tags || []).join(', '),
       });
       setImages((product.images || []).map(i => ({ id: i.id, url: i.url, is_primary: i.is_primary })));
     } else {
@@ -125,6 +126,7 @@ const ProductForm: React.FC<Props> = ({ open, onClose, product, onSaved }) => {
       is_featured: !!data.is_featured,
       is_best_seller: !!data.is_best_seller,
       is_new: !!data.is_new,
+      sold_out_override: !!data.sold_out_override,
       tags: data.tags ? data.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : [],
     };
 
@@ -210,6 +212,11 @@ const ProductForm: React.FC<Props> = ({ open, onClose, product, onSaved }) => {
         </div>
 
         <ColoursEditor rows={colours} onChange={setColours} imageUrls={images.map(i => i.url)} />
+
+        <label className="md:col-span-2 flex items-start gap-3 rounded-2xl border-2 border-red-100 bg-red-50/50 px-4 py-3 cursor-pointer">
+          <input type="checkbox" {...register('sold_out_override')} className="mt-1 h-5 w-5 accent-red-500" />
+          <span><span className="block font-extrabold text-ink-900">Show as &ldquo;Out of stock&rdquo; to customers</span><span className="block text-xs font-semibold text-ink-500">Customers see it as sold out and cannot order it, even if you have stock. Your real stock numbers stay the same. Untick to sell it again.</span></span>
+        </label>
 
         {product?.id && <div className="md:col-span-2"><ProductPurchaseHistory productId={product.id} currency="LKR" /></div>}
 
