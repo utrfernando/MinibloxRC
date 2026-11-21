@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { supabase, formatCurrency, type Product, type Purchase, type Supplier } from '../../lib/supabase';
-import { PARTNERS, IMPORT_CATEGORY, type PurchasePayment } from '../../lib/finance';
+import { PARTNERS, IMPORT_CATEGORY, FUND_PAYER, type PurchasePayment } from '../../lib/finance';
 import { PaidFromSelect } from './finance/PaidFromSelect';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
@@ -121,11 +121,14 @@ export const PurchaseEditorModal: React.FC<{
     }
 
     // 4) freight / customs expense
-    const fRow = { expense_date: date, category: IMPORT_CATEGORY, description: `Freight/customs for ${ref}`, amount: extra, paid_by: importPaidBy, reference: ref };
+    const freightFrom = importPaidBy === FUND_PAYER ? 'fund'
+      : freight && freight.paid_by !== FUND_PAYER ? (freight.paid_from || 'own')
+      : (pays[0]?.paid_from && pays[0].paid_from !== 'fund' ? pays[0].paid_from : 'own');
+    const fRow = { expense_date: date, category: IMPORT_CATEGORY, description: `Freight/customs for ${ref}`, amount: extra, paid_by: importPaidBy, paid_from: freightFrom, reference: ref };
     if (extra > 0) {
       const { error: fe } = freight
         ? await supabase.from('expenses').update(fRow).eq('id', freight.id)
-        : await supabase.from('expenses').insert({ ...fRow, paid_from: pays[0]?.paid_from || 'fund', payment_method: pays[0]?.method || 'bank', created_by: userId });
+        : await supabase.from('expenses').insert({ ...fRow, payment_method: pays[0]?.method || 'bank', created_by: userId });
       if (fe) error('The freight expense could not be saved: ' + fe.message);
     } else if (freight) {
       await supabase.from('expenses').delete().eq('id', freight.id);
@@ -184,8 +187,8 @@ export const PurchaseEditorModal: React.FC<{
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 rounded-3xl bg-cream-100 p-4">
           <Field label="Freight + customs for this shipment" hint="Set to 0 or empty to remove"><Input type="number" min="0" step="0.01" value={importCost} onChange={e => setImportCost(e.target.value)} placeholder="0.00" /></Field>
-          <Field label="Freight done by"><Select value={importPaidBy} onChange={e => setImportPaidBy(e.target.value)}><option value="">Select…</option>{PARTNERS.map(p => <option key={p}>{p}</option>)}</Select></Field>
-          <p className="text-xs font-semibold text-ink-500 self-end pb-2">Saved as an &ldquo;{IMPORT_CATEGORY}&rdquo; expense. Product average costs are not recalculated when you edit.</p>
+          <Field label="Freight done by"><Select value={importPaidBy} onChange={e => setImportPaidBy(e.target.value)}><option value="">Select…</option>{PARTNERS.map(p => <option key={p}>{p}</option>)}<option value={FUND_PAYER}>Business fund</option></Select></Field>
+          <p className="text-xs font-semibold text-ink-500 self-end pb-2">Choose <b>Business fund</b> to pay it out of the fund. Saved as an &ldquo;{IMPORT_CATEGORY}&rdquo; expense. Product average costs are not recalculated when you edit.</p>
         </div>
 
         <Field label="Notes"><Textarea value={notes} onChange={e => setNotes(e.target.value)} className="min-h-[60px]" /></Field>

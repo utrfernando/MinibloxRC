@@ -8,6 +8,8 @@ export const STOCK_CATEGORY = 'Goods for resale';
 const LEGACY_STOCK_CATEGORY = 'Stock purchase';
 /** Freight / customs on an incoming shipment. Added into the product's landed cost, so it is not a running cost either. */
 export const IMPORT_CATEGORY = 'Import & freight';
+/** Picked as "done by" when a cost is paid straight out of the business fund. */
+export const FUND_PAYER = 'Business fund';
 export const EXPENSE_CATEGORIES = ['Shipping & delivery', STOCK_CATEGORY, IMPORT_CATEGORY, 'Packaging', 'Advertising', 'Salaries & wages', 'Rent', 'Utilities', 'Platform & payment fees', 'Software & tools', 'Taxes & licences', 'Other'];
 
 /** Categories that count as running costs (everything except stock purchases). */

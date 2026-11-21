@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, ArrowUpFromLine, Package, Truck, Pencil } from 'lucide-react';
 import { PurchaseEditorModal } from '../../components/admin/PurchaseEditorModal';
 import { InvoiceControl } from '../../components/admin/InvoiceControl';
-import { PARTNERS, IMPORT_CATEGORY, type PurchasePayment } from '../../lib/finance';
+import { PARTNERS, IMPORT_CATEGORY, FUND_PAYER, type PurchasePayment } from '../../lib/finance';
 import { PaidFromSelect } from '../../components/admin/finance/PaidFromSelect';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAdminSub } from '../../lib/adminRoute';
@@ -344,7 +344,7 @@ const PurchaseModal: React.FC<{ open: boolean; onClose: () => void; products: Pr
     if (extra > 0) {
       const { error: xe } = await supabase.from('expenses').insert({
         expense_date: date, category: IMPORT_CATEGORY, description: `Freight/customs for ${reference || 'purchase'}`, amount: extra,
-        paid_by: importPaidBy, paid_from: payFrom, payment_method: payMethod, reference: reference || null, created_by: userId,
+        paid_by: importPaidBy, paid_from: importPaidBy === FUND_PAYER ? 'fund' : payFrom, payment_method: payMethod, reference: reference || null, created_by: userId,
       });
       if (xe) error('Purchase saved, but the freight expense was not recorded: ' + xe.message);
     }
@@ -423,8 +423,8 @@ const PurchaseModal: React.FC<{ open: boolean; onClose: () => void; products: Pr
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 rounded-3xl bg-cream-100 p-4">
           <Field label="Freight + customs for this shipment" hint="Spread into each product's cost price"><Input type="number" min="0" step="0.01" value={importCost} onChange={e => setImportCost(e.target.value)} placeholder="0.00" /></Field>
-          <Field label="Freight done by"><Select value={importPaidBy} onChange={e => setImportPaidBy(e.target.value)}><option value="">Select…</option>{PARTNERS.map(p => <option key={p}>{p}</option>)}</Select></Field>
-          <p className="text-xs font-semibold text-ink-500 self-end pb-2">Saved as an "{IMPORT_CATEGORY}" expense for the partner, and added to landed cost — so it is not counted twice in profit.</p>
+          <Field label="Freight done by"><Select value={importPaidBy} onChange={e => setImportPaidBy(e.target.value)}><option value="">Select…</option>{PARTNERS.map(p => <option key={p}>{p}</option>)}<option value={FUND_PAYER}>Business fund</option></Select></Field>
+          <p className="text-xs font-semibold text-ink-500 self-end pb-2">Choose <b>Business fund</b> to pay it out of the fund. Saved as an "{IMPORT_CATEGORY}" expense for the partner, and added to landed cost — so it is not counted twice in profit.</p>
         </div>
         <Field label="Notes"><Textarea value={notes} onChange={e => setNotes(e.target.value)} className="min-h-[60px]" /></Field>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
