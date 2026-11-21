@@ -1,11 +1,16 @@
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
-import { supabase, isSupabaseConfigured, unitPrice, type Product } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, unitPrice, type Product, type ProductVariant } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 
 export type CartItem = {
   product: Product;
   quantity: number;
+  variant?: ProductVariant | null;   // the colour chosen, for products that come in colours
 };
+
+/** stock available for this cart line */
+export const lineStock = (i: { product: Product; variant?: ProductVariant | null }) => i.variant ? i.variant.stock_quantity : i.product.stock_quantity;
+const sameLine = (i: CartItem, productId: string, variantId?: string | null) => i.product.id === productId && (i.variant?.id ?? null) === (variantId ?? null);
 
 interface CartContextType {
   items: CartItem[];
@@ -13,9 +18,9 @@ interface CartContextType {
   subtotal: number;
   wishlistIds: string[];
   wishlistItems: CartItem[];
-  addToCart: (product: Product, quantity?: number) => void;
-  removeFromCart: (productId: string) => void;
-  setQuantity: (productId: string, quantity: number) => void;
+  addToCart: (product: Product, quantity?: number, variant?: ProductVariant | null) => void;
+  removeFromCart: (productId: string, variantId?: string | null) => void;
+  setQuantity: (productId: string, quantity: number, variantId?: string | null) => void;
   clearCart: () => void;
   toggleWishlist: (product: Product) => Promise<boolean>;
   isWishlisted: (productId: string) => boolean;
@@ -66,12 +71,17 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (cart?.id) {
         const { data: rows } = await supabase
           .from('cart_items')
-          .select('quantity, products(*)')
+          .select('quantity, variant_id, products(*, variants:product_variants(*))')
           .eq('cart_id', cart.id);
         if (rows?.length) {
           setItems(rows
             .filter(r => r.products && (r.products as any).status === 'published')
-            .map(r => ({ product: r.products as unknown as Product, quantity: r.quantity })));
+            .map(r => {
+              const product = r.products as unknown as Product;
+              const variant = (r as any).variant_id ? (product.variants || []).find(v => v.id === (r as any).variant_id) || null : null;
+              return { product, quantity: r.quantity, variant };
+            })
+            );
         }
       }
       if (wl?.id) {
@@ -99,7 +109,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.from('cart_items').delete().eq('cart_id', cart.id);
     if (next.length) {
       await supabase.from('cart_items').insert(
-        next.map(i => ({ cart_id: cart.id, product_id: i.product.id, quantity: i.quantity }))
+        next.map(i => ({ cart_id: cart.id, product_id: i.product.id, variant_id: i.variant?.id ?? null, quantity: i.quantity }))
       );
     }
   }, [authUserId]);
@@ -118,35 +128,31 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [authUserId]);
 
-  const addToCart = (product: Product, quantity = 1) => {
-    const max = product.stock_quantity;
+  const addToCart = (product: Product, quantity = 1, variant: ProductVariant | null = null) => {
+    const max = lineStock({ product, variant });
     setItems(prev => {
-      const existing = prev.find(i => i.product.id === product.id);
+      const existing = prev.find(i => sameLine(i, product.id, variant?.id));
       const next = existing
-        ? prev.map(i => i.product.id === product.id
-            ? { ...i, quantity: Math.min(i.quantity + quantity, max) }
-            : i)
-        : [...prev, { product, quantity: Math.min(quantity, max) }];
+        ? prev.map(i => sameLine(i, product.id, variant?.id) ? { ...i, quantity: Math.min(i.quantity + quantity, max) } : i)
+        : [...prev, { product, variant, quantity: Math.min(quantity, max) }];
       syncCartToDb(next);
       return next;
     });
   };
 
-  const removeFromCart = (productId: string) => {
+  const removeFromCart = (productId: string, variantId: string | null = null) => {
     setItems(prev => {
-      const next = prev.filter(i => i.product.id !== productId);
+      const next = prev.filter(i => !sameLine(i, productId, variantId));
       syncCartToDb(next);
       return next;
     });
   };
 
-  const setQuantity = (productId: string, quantity: number) => {
+  const setQuantity = (productId: string, quantity: number, variantId: string | null = null) => {
     setItems(prev => {
       const next = quantity <= 0
-        ? prev.filter(i => i.product.id !== productId)
-        : prev.map(i => i.product.id === productId
-            ? { ...i, quantity: Math.min(quantity, i.product.stock_quantity) }
-            : i);
+        ? prev.filter(i => !sameLine(i, productId, variantId))
+        : prev.map(i => sameLine(i, productId, variantId) ? { ...i, quantity: Math.min(quantity, lineStock(i)) } : i);
       syncCartToDb(next);
       return next;
     });

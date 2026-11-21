@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Heart, ShoppingBag, Star } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { type Product, formatCurrency, hasDiscount, unitPrice } from '../lib/supabase';
@@ -23,6 +23,8 @@ const ProductCard: React.FC<{ product: Product; index?: number }> = ({ product, 
   const { currency } = useSettings();
   const wishlisted = isWishlisted(product.id);
   const outOfStock = product.stock_quantity <= 0;
+  const navigate = useNavigate();
+  const hasColours = (product.variants?.length || 0) > 0;
   const price = effectivePrice(product);
   const discountPct = hasDiscount(product)
     ? Math.round((1 - (product.discount_price as number) / product.selling_price) * 100)
@@ -76,12 +78,12 @@ const ProductCard: React.FC<{ product: Product; index?: number }> = ({ product, 
           )}
         </div>
         <button
-          onClick={() => { addToCart(product); success(`${product.name} added to cart`); }}
+          onClick={() => { if (hasColours) { navigate(`/product/${product.id}`); return; } addToCart(product); success(`${product.name} added to cart`); }}
           disabled={outOfStock}
           className="mt-3 inline-flex items-center justify-center gap-1.5 sm:gap-2 whitespace-nowrap rounded-full bg-mint-500 hover:bg-mint-600 disabled:bg-ink-200 disabled:text-ink-400 text-white text-xs sm:text-sm font-bold px-2 py-2 sm:py-2.5 transition-all active:scale-[0.98]"
         >
           <ShoppingBag size={15} className="shrink-0" />
-          {outOfStock ? 'Out of Stock' : 'Add to Cart'}
+          {outOfStock ? 'Out of Stock' : hasColours ? 'Choose colour' : 'Add to Cart'}
         </button>
       </div>
     </motion.div>

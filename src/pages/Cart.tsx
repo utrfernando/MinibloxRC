@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Minus, Plus, Trash2, ShoppingBag, TicketPercent, ArrowRight } from 'lucide-react';
-import { useCart } from '../contexts/CartContext';
+import { useCart, lineStock } from '../contexts/CartContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -82,30 +82,32 @@ const Cart: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Items */}
         <div className="lg:col-span-2 space-y-4">
-          {items.map(({ product, quantity }) => {
+          {items.map((line) => {
+            const { product, quantity, variant } = line;
+            const stock = lineStock(line);
             const price = effectivePrice(product);
-            const img = primaryImage(product);
+            const img = variant?.image_url || primaryImage(product);
             return (
-              <div key={product.id} className="flex gap-4 rounded-4xl border border-ink-100 bg-white p-4 shadow-soft">
+              <div key={product.id + (variant?.id || '')} className="flex gap-4 rounded-4xl border border-ink-100 bg-white p-4 shadow-soft">
                 <Link to={`/product/${product.id}`} className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl overflow-hidden shrink-0 product-image-container">
                   <ProductImage src={img} alt={product.name} iconClassName="w-10 h-10" />
                 </Link>
                 <div className="flex-1 min-w-0">
                   <Link to={`/product/${product.id}`} className="font-display font-bold text-ink-900 hover:text-mint-600 line-clamp-2">{product.name}</Link>
-                  <p className="text-xs text-ink-400 font-semibold mt-0.5">{product.category?.name}</p>
+                  <p className="text-xs text-ink-400 font-semibold mt-0.5">{variant ? <span className="text-mint-700 font-extrabold">Colour: {variant.name}</span> : product.category?.name}</p>
                   <div className="flex items-center justify-between mt-3 flex-wrap gap-2">
                     <div className="inline-flex items-center rounded-full border-2 border-ink-100">
-                      <button onClick={() => setQuantity(product.id, quantity - 1)} className="px-3 py-1.5 hover:bg-ink-50"><Minus size={14} /></button>
+                      <button onClick={() => setQuantity(product.id, quantity - 1, variant?.id)} className="px-3 py-1.5 hover:bg-ink-50"><Minus size={14} /></button>
                       <span className="px-3 font-extrabold text-sm">{quantity}</span>
-                      <button onClick={() => setQuantity(product.id, quantity + 1)} disabled={quantity >= product.stock_quantity} className="px-3 py-1.5 hover:bg-ink-50 disabled:opacity-40"><Plus size={14} /></button>
+                      <button onClick={() => setQuantity(product.id, quantity + 1, variant?.id)} disabled={quantity >= stock} className="px-3 py-1.5 hover:bg-ink-50 disabled:opacity-40"><Plus size={14} /></button>
                     </div>
                     <p className="font-extrabold text-ink-900">{formatCurrency(price * quantity, currency)}</p>
                   </div>
-                  {product.stock_quantity <= quantity && product.stock_quantity > 0 && (
-                    <p className="text-xs text-sunshine-600 font-bold mt-1">Max available: {product.stock_quantity}</p>
+                  {stock <= quantity && stock > 0 && (
+                    <p className="text-xs text-sunshine-600 font-bold mt-1">Max available: {stock}</p>
                   )}
                 </div>
-                <button onClick={() => { removeFromCart(product.id); success('Removed from cart'); }} className="self-start p-2 text-ink-300 hover:text-red-500 transition" aria-label="Remove">
+                <button onClick={() => { removeFromCart(product.id, variant?.id); success('Removed from cart'); }} className="self-start p-2 text-ink-300 hover:text-red-500 transition" aria-label="Remove">
                   <Trash2 size={18} />
                 </button>
               </div>

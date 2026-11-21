@@ -47,6 +47,16 @@ export type Supplier = {
 
 export type ProductStatus = 'draft' | 'published' | 'archived';
 
+export type ProductVariant = {
+  id: string;
+  product_id: string;
+  name: string;
+  color_hex: string | null;
+  image_url: string | null;
+  stock_quantity: number;
+  sort_order: number;
+};
+
 export type Product = {
   id: string;
   name: string;
@@ -71,6 +81,7 @@ export type Product = {
   // joined
   category?: Category | null;
   images?: ProductImage[];
+  variants?: ProductVariant[];
 };
 
 export type ProductImage = {
@@ -104,6 +115,7 @@ export type PurchaseItem = {
   product_id: string;
   quantity: number;
   unit_cost: number;
+  variant_id?: string | null;
 };
 
 export type InventoryTransaction = {
@@ -194,6 +206,8 @@ export type OrderItem = {
   unit_price: number;
   quantity: number;
   line_total: number;
+  variant_id?: string | null;
+  variant_name?: string | null;
   created_at: string;
 };
 

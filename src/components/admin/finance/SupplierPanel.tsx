@@ -79,7 +79,7 @@ export const PaymentModal: React.FC<{ purchase: PurchasePay | null; money: (n: n
 };
 
 /** Fix a payment that was entered wrongly: amount, date, who made it, where the money came from, method, reference. */
-const EditPaymentModal: React.FC<{ payment: PurchasePayment | null; onClose: () => void; onSaved: () => void }> = ({ payment, onClose, onSaved }) => {
+export const EditPaymentModal: React.FC<{ payment: PurchasePayment | null; onClose: () => void; onSaved: () => void }> = ({ payment, onClose, onSaved }) => {
   const { success, error } = useToast();
   const [f, setF] = useState({ amount: '', date: '', paidBy: '', paidFrom: 'fund', method: 'bank', reference: '' });
   const [saving, setSaving] = useState(false);

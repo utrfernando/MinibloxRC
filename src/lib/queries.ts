@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase, isSupabaseConfigured, type Product, type Category, type Banner, type HomepageSection } from './supabase';
 
-const PRODUCT_SELECT = '*, category:categories(*), images:product_images(*)';
+const PRODUCT_SELECT = '*, category:categories(*), images:product_images(*), variants:product_variants(*)';
 
 export type ProductFilters = {
   categorySlug?: string | null;

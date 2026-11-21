@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, ArrowUpFromLine, Package, Truck } from 'lucide-react';
+import { Plus, ArrowUpFromLine, Package, Truck, Pencil } from 'lucide-react';
+import { PurchaseEditorModal } from '../../components/admin/PurchaseEditorModal';
 import { InvoiceControl } from '../../components/admin/InvoiceControl';
 import { PARTNERS, IMPORT_CATEGORY, type PurchasePayment } from '../../lib/finance';
 import { PaidFromSelect } from '../../components/admin/finance/PaidFromSelect';
@@ -42,9 +43,12 @@ const AdminInventory: React.FC = () => {
   const [purchaseModal, setPurchaseModal] = useState(false);
   const [payFor, setPayFor] = useState<PurchasePay | null>(null);
   const [editPurchase, setEditPurchase] = useState<PurchasePay | null>(null);
+  const [editFull, setEditFull] = useState<Purchase | null>(null);
+  const ask = useConfirm();
+  const toast = useToast();
   const load = async () => {
     const [p, t, pu, s, pp] = await Promise.all([
-      supabase.from('products').select('*, category:categories(*), ' + PRODUCT_COSTS_EMBED),
+      supabase.from('products').select('*, category:categories(*), variants:product_variants(*), ' + PRODUCT_COSTS_EMBED),
       supabase.from('inventory_transactions').select('*, product:products(id,name,sku)').order('created_at', { ascending: false }).limit(200),
       supabase.from('purchases').select('*, supplier:suppliers(*), items:purchase_items(*)').order('purchase_date', { ascending: false }),
       supabase.from('suppliers').select('*').order('name'),
@@ -57,6 +61,34 @@ const AdminInventory: React.FC = () => {
     setSuppliers((s.data || []) as Supplier[]);
   };
   useEffect(() => { load(); }, []);
+
+  /** Delete a whole purchase: takes its stock back out, removes its payments and receipts. */
+  const removePurchase = async (pu: Purchase) => {
+    const items = (pu.items || []) as any[];
+    const pays = payments.filter(x => x.purchase_id === pu.id);
+    const msg = `Delete purchase ${pu.reference || ''}? This takes its ${items.reduce((s, i) => s + i.quantity, 0)} item(s) back out of stock` + (pays.length ? ` and deletes its ${pays.length} payment(s)` : '') + '. Any freight expense you added separately stays. This cannot be undone.';
+    if (!(await ask({ message: msg, danger: true, confirmLabel: 'Delete purchase' }))) return;
+    // stock check first: group lines by product + colour
+    const totals = new Map<string, { pid: string; vid: string; qty: number }>();
+    for (const it of items) { const k = `${it.product_id}|${it.variant_id || ''}`; const t = totals.get(k) || { pid: it.product_id, vid: it.variant_id || '', qty: 0 }; t.qty += it.quantity; totals.set(k, t); }
+    const plan: { pid: string; vid: string; qty: number; cur: number }[] = [];
+    for (const t of totals.values()) {
+      const q = t.vid ? await supabase.from('product_variants').select('stock_quantity').eq('id', t.vid).maybeSingle() : await supabase.from('products').select('stock_quantity').eq('id', t.pid).maybeSingle();
+      const cur = (q.data as any)?.stock_quantity ?? 0;
+      if (cur < t.qty) return toast.error(`Cannot delete: ${products.find(p => p.id === t.pid)?.name || 'a product'} from this purchase has already been sold or adjusted. Edit the quantities instead.`);
+      plan.push({ ...t, cur });
+    }
+    for (const p of plan) {
+      if (p.vid) await supabase.from('product_variants').update({ stock_quantity: p.cur - p.qty }).eq('id', p.vid);
+      else await supabase.from('products').update({ stock_quantity: p.cur - p.qty }).eq('id', p.pid);
+      await supabase.from('inventory_transactions').insert({ product_id: p.pid, quantity_change: -p.qty, reason: 'correction', reference_type: 'purchase', reference_id: pu.id, notes: `Purchase ${pu.reference || ''} deleted`.trim(), created_by: authUserId });
+    }
+    const files = [pu.invoice_path, ...pays.map(x => x.receipt_path)].filter(Boolean) as string[];
+    const { error: e } = await supabase.from('purchases').delete().eq('id', pu.id);
+    if (e) return toast.error(e.message);
+    if (files.length) await supabase.storage.from('invoices').remove(files);
+    toast.success('Purchase deleted'); load();
+  };
 
   const stats = useMemo(() => {
     const totalStock = products.reduce((s, p) => s + p.stock_quantity, 0);
@@ -103,7 +135,7 @@ const AdminInventory: React.FC = () => {
             <Table head={['Product', 'Supplier', 'In Stock', 'Threshold', 'Unit Cost', 'Value', '']}>
               {products.map(p => (
                 <tr key={p.id} className="hover:bg-ink-50/50">
-                  <Td><p className="font-bold text-ink-900">{p.name}</p><p className="text-xs text-ink-400">{p.sku}</p></Td>
+                  <Td><p className="font-bold text-ink-900">{p.name}</p><p className="text-xs text-ink-400">{p.sku}</p>{(p.variants?.length || 0) > 0 && <p className="mt-1 flex flex-wrap gap-1">{[...p.variants!].sort((a, b) => a.sort_order - b.sort_order).map(v => <span key={v.id} className={cn('rounded-full px-2 py-0.5 text-[11px] font-bold', v.stock_quantity <= 0 ? 'bg-red-50 text-red-600' : 'bg-mint-50 text-mint-700')}>{v.name} {v.stock_quantity}</span>)}</p>}</Td>
                   <Td className="text-ink-600">{suppliers.find(s => s.id === p.supplier_id)?.name || '—'}</Td>
                   <Td><span className={cn('inline-flex rounded-full px-2.5 py-1 text-xs font-extrabold', stockBadge(p.stock_quantity, p.low_stock_threshold))}>{p.stock_quantity}</span></Td>
                   <Td className="text-ink-500">{p.low_stock_threshold}</Td>
@@ -149,7 +181,10 @@ const AdminInventory: React.FC = () => {
                     {owedOn(pu as PurchasePay) > 0 && <button onClick={() => setPayFor(pu as PurchasePay)} className="text-xs font-extrabold text-mint-700 hover:underline">Pay {formatCurrency(owedOn(pu as PurchasePay), currency)}</button>}
                   </div>
                   <InvoiceControl table="purchases" id={pu.id} path={pu.invoice_path} name={pu.invoice_name} onChanged={load} />
-                  <button onClick={() => setEditPurchase(pu as PurchasePay)} className="text-xs font-extrabold text-mint-700 hover:underline">Edit invoice no. / details</button>
+                  <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+                    <button onClick={() => setEditFull(pu)} className="inline-flex items-center gap-1 rounded-full border-2 border-mint-300 px-3 py-1 text-xs font-extrabold text-mint-700 hover:bg-mint-50"><Pencil size={13} /> Edit</button>
+                    <button onClick={() => removePurchase(pu)} className="text-xs font-extrabold text-red-500 hover:underline">Delete</button>
+                  </div>
                 </div>
               </div>
               {/* every payment for this shipment, each with its own receipt */}
@@ -167,7 +202,8 @@ const AdminInventory: React.FC = () => {
               <div className="text-sm text-ink-600 space-y-1">
                 {pu.items?.map((it, i) => {
                   const prod = products.find(p => p.id === it.product_id);
-                  return <p key={i}>• {prod?.name || 'Product'} — {it.quantity} × {formatCurrency(it.unit_cost, currency)}</p>;
+                  const vn = (it as any).variant_id ? prod?.variants?.find(v => v.id === (it as any).variant_id)?.name : null;
+                  return <p key={i}>• {prod?.name || 'Product'}{vn ? ` (${vn})` : ''} — {it.quantity} × {formatCurrency(it.unit_cost, currency)}</p>;
                 })}
               </div>
             </div>
@@ -178,6 +214,7 @@ const AdminInventory: React.FC = () => {
 
 
       <AdjustModal product={adjustFor} onClose={() => setAdjustFor(null)} onSaved={() => { setAdjustFor(null); load(); }} />
+      <PurchaseEditorModal purchase={editFull} payments={payments} products={products} suppliers={suppliers} currency={currency} userId={authUserId} onClose={() => setEditFull(null)} onSaved={() => { setEditFull(null); load(); }} />
       <EditPurchaseModal purchase={editPurchase} suppliers={suppliers} onClose={() => setEditPurchase(null)} onSaved={() => { setEditPurchase(null); load(); }} />
       <PaymentModal purchase={payFor} money={n => formatCurrency(n, currency)} onClose={() => setPayFor(null)} onSaved={() => { setPayFor(null); load(); }} />
       <PurchaseModal open={purchaseModal} onClose={() => setPurchaseModal(false)} products={products} suppliers={suppliers} existingRefs={purchases.map(p => (p.reference || '').trim().toLowerCase()).filter(Boolean)} userId={authUserId} onSaved={() => { setPurchaseModal(false); load(); }} />
@@ -192,7 +229,7 @@ const StockList: React.FC<{ title: string; products: Product[]; onAdjust: (p: Pr
     <div className="space-y-2 max-h-72 overflow-y-auto">
       {products.map(p => (
         <div key={p.id} className="flex items-center justify-between gap-3 py-2 border-b border-ink-50 last:border-0">
-          <div className="min-w-0"><p className="font-bold text-ink-900 text-sm truncate">{p.name}</p><p className="text-xs text-ink-400">{p.sku}</p></div>
+          <div className="min-w-0"><p className="font-bold text-ink-900 text-sm truncate">{p.name}</p><p className="text-xs text-ink-400">{p.sku}</p>{(p.variants?.length || 0) > 0 && <p className="mt-1 flex flex-wrap gap-1">{[...p.variants!].sort((a, b) => a.sort_order - b.sort_order).map(v => <span key={v.id} className={cn('rounded-full px-2 py-0.5 text-[11px] font-bold', v.stock_quantity <= 0 ? 'bg-red-50 text-red-600' : 'bg-mint-50 text-mint-700')}>{v.name} {v.stock_quantity}</span>)}</p>}</div>
           <div className="flex items-center gap-2 shrink-0">
             <span className={cn('rounded-full px-2.5 py-1 text-xs font-extrabold', stockBadge(p.stock_quantity, p.low_stock_threshold))}>{p.stock_quantity}</span>
             <Button variant="ghost" size="sm" onClick={() => onAdjust(p)}>Adjust</Button>
@@ -212,19 +249,26 @@ const AdjustModal: React.FC<{ product: Product | null; onClose: () => void; onSa
   const [reason, setReason] = useState<'adjustment' | 'correction' | 'damage'>('adjustment');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const variants = [...(product?.variants || [])].sort((a, b) => a.sort_order - b.sort_order);
+  const [variantId, setVariantId] = useState('');
+  const variant = variants.find(v => v.id === variantId) || null;
+  const current = variant ? variant.stock_quantity : (product?.stock_quantity ?? 0);
 
-  useEffect(() => { if (product) { setQty(''); setNotes(''); } }, [product]);
+  useEffect(() => { if (product) { setQty(''); setNotes(''); setVariantId(product.variants?.[0]?.id || ''); } }, [product]);
 
   const save = async () => {
     const delta = Number(qty);
     if (!product || !delta) { error('Enter a quantity (+ to add, − to remove)'); return; }
-    const newStock = product.stock_quantity + delta;
+    if (variants.length && !variant) { error('Choose which colour to adjust.'); return; }
+    const newStock = current + delta;
     if (newStock < 0) { error('Stock cannot go below zero'); return; }
     setSaving(true);
-    const { error: e } = await supabase.from('products').update({ stock_quantity: newStock }).eq('id', product.id);
+    const { error: e } = variant
+      ? await supabase.from('product_variants').update({ stock_quantity: newStock }).eq('id', variant.id)
+      : await supabase.from('products').update({ stock_quantity: newStock }).eq('id', product.id);
     if (e) { error(e.message); setSaving(false); return; }
     await supabase.from('inventory_transactions').insert({
-      product_id: product.id, quantity_change: delta, reason, notes: notes || `Manual ${reason}`, created_by: authUserId,
+      product_id: product.id, quantity_change: delta, reason, notes: (notes || `Manual ${reason}`) + (variant ? ` (${variant.name})` : ''), created_by: authUserId,
     });
     setSaving(false); success(`Stock updated to ${newStock}`); onSaved();
   };
@@ -232,7 +276,10 @@ const AdjustModal: React.FC<{ product: Product | null; onClose: () => void; onSa
   return (
     <Modal open={!!product} onClose={onClose} title={`Adjust Stock — ${product?.name}`}>
       <div className="space-y-4">
-        <p className="text-sm text-ink-500">Current stock: <strong className="text-ink-900">{product?.stock_quantity}</strong></p>
+        {variants.length > 0 && (
+          <Field label="Colour"><Select value={variantId} onChange={e => setVariantId(e.target.value)}>{variants.map(v => <option key={v.id} value={v.id}>{v.name} ({v.stock_quantity} in stock)</option>)}</Select></Field>
+        )}
+        <p className="text-sm text-ink-500">Current stock{variant ? ` (${variant.name})` : ''}: <strong className="text-ink-900">{current}</strong></p>
         <Field label="Quantity Change (+ add / − remove)"><Input type="number" value={qty} onChange={e => setQty(e.target.value)} placeholder="e.g. 10 or -3" /></Field>
         <Field label="Reason">
           <Select value={reason} onChange={e => setReason(e.target.value as any)}>
@@ -262,7 +309,7 @@ const PurchaseModal: React.FC<{ open: boolean; onClose: () => void; products: Pr
   const [payMethod, setPayMethod] = useState('bank');
   const [importCost, setImportCost] = useState('');
   const [importPaidBy, setImportPaidBy] = useState('');
-  const [rows, setRows] = useState<{ product_id: string; quantity: number; unit_cost: number }[]>([{ product_id: '', quantity: 1, unit_cost: 0 }]);
+  const [rows, setRows] = useState<{ product_id: string; variant_id?: string; quantity: number; unit_cost: number }[]>([{ product_id: '', quantity: 1, unit_cost: 0 }]);
   const [saving, setSaving] = useState(false);
 
   const total = rows.reduce((s, r) => s + r.quantity * r.unit_cost, 0);
@@ -272,6 +319,8 @@ const PurchaseModal: React.FC<{ open: boolean; onClose: () => void; products: Pr
   const save = async () => {
     const valid = rows.filter(r => r.product_id && r.quantity > 0);
     if (!valid.length) { error('Add at least one item'); return; }
+    const needColour = valid.find(r => (products.find(p => p.id === r.product_id)?.variants?.length || 0) > 0 && !r.variant_id);
+    if (needColour) { error(`Choose the colour for ${products.find(p => p.id === needColour.product_id)?.name}.`); return; }
     if (!reference.trim()) { error('Enter the supplier invoice / order number — it links this shipment to its payments and products.'); return; }
     if (existingRefs.includes(reference.trim().toLowerCase()) && !(await ask({ message: `A purchase with invoice no. "${reference.trim()}" already exists. Record this one anyway?`, danger: false, confirmLabel: 'Record anyway' }))) return;
     const paid = Math.min(Math.max(0, Number(paidNow) || 0), total);
@@ -284,7 +333,7 @@ const PurchaseModal: React.FC<{ open: boolean; onClose: () => void; products: Pr
       ...(extra > 0 ? { extra_costs: extra } : {}),
     }).select('id').single();
     if (e) { error(e.message); setSaving(false); return; }
-    await supabase.from('purchase_items').insert(valid.map(r => ({ purchase_id: purchase.id, product_id: r.product_id, quantity: r.quantity, unit_cost: r.unit_cost })));
+    await supabase.from('purchase_items').insert(valid.map(r => ({ purchase_id: purchase.id, product_id: r.product_id, quantity: r.quantity, unit_cost: r.unit_cost, ...(r.variant_id ? { variant_id: r.variant_id } : {}) })));
 
     // Supplier payment (who paid is kept, so the Partners tab credits them)
     if (paid > 0) {
@@ -315,14 +364,20 @@ const PurchaseModal: React.FC<{ open: boolean; onClose: () => void; products: Pr
       const newStock = cur.stock + r.quantity;
       const newLanded = cur.stock > 0 && cur.landed > 0 ? (cur.stock * cur.landed + r.quantity * unitLanded) / newStock : unitLanded || cur.landed;
       live.set(r.product_id, { stock: newStock, landed: Math.round(newLanded * 100) / 100, supplier: cur.supplier || r.unit_cost });
-      await supabase.from('products').update({ stock_quantity: newStock }).eq('id', r.product_id);
+      const vname = r.variant_id ? prod.variants?.find(v => v.id === r.variant_id)?.name : null;
+      if (r.variant_id) {
+        const { data: fresh } = await supabase.from('product_variants').select('stock_quantity').eq('id', r.variant_id).single();
+        await supabase.from('product_variants').update({ stock_quantity: (fresh?.stock_quantity ?? 0) + r.quantity }).eq('id', r.variant_id);
+      } else {
+        await supabase.from('products').update({ stock_quantity: newStock }).eq('id', r.product_id);
+      }
       await supabase.from('product_costs').upsert({
         product_id: r.product_id,
         supplier_id: supplierId || prod.supplier_id || null,
         supplier_cost: live.get(r.product_id)!.supplier,
         landed_cost: live.get(r.product_id)!.landed,
       });
-      await supabase.from('inventory_transactions').insert({ product_id: r.product_id, quantity_change: r.quantity, reason: 'purchase', reference_type: 'purchase', reference_id: purchase.id, notes: `Purchase ${reference || ''}`.trim(), created_by: userId });
+      await supabase.from('inventory_transactions').insert({ product_id: r.product_id, quantity_change: r.quantity, reason: 'purchase', reference_type: 'purchase', reference_id: purchase.id, notes: `Purchase ${reference || ''}${vname ? ' (' + vname + ')' : ''}`.trim(), created_by: userId });
     }
     setSaving(false); success('Purchase recorded & stock updated'); onSaved();
   };
@@ -343,10 +398,16 @@ const PurchaseModal: React.FC<{ open: boolean; onClose: () => void; products: Pr
           </div>
           {rows.map((r, i) => (
             <div key={i} className="grid grid-cols-2 sm:grid-cols-[1fr_90px_110px_36px] gap-2 rounded-2xl bg-ink-50/60 p-2 sm:bg-transparent sm:p-0">
-              <Select className="col-span-2 sm:col-span-1" aria-label="Product" value={r.product_id} onChange={e => setRows(rows.map((x, j) => j === i ? { ...x, product_id: e.target.value } : x))}>
+              <Select className="col-span-2 sm:col-span-1" aria-label="Product" value={r.product_id} onChange={e => setRows(rows.map((x, j) => j === i ? { ...x, product_id: e.target.value, variant_id: '' } : x))}>
                 <option value="">Select…</option>
                 {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </Select>
+              {(products.find(p => p.id === r.product_id)?.variants?.length || 0) > 0 && (
+                <Select className="col-span-2 sm:col-span-1" aria-label="Colour" value={r.variant_id || ''} onChange={e => setRows(rows.map((x, j) => j === i ? { ...x, variant_id: e.target.value } : x))}>
+                  <option value="">Colour…</option>
+                  {products.find(p => p.id === r.product_id)!.variants!.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                </Select>
+              )}
               <Input type="number" min={1} placeholder="Qty" aria-label="Quantity" value={r.quantity} onChange={e => setRows(rows.map((x, j) => j === i ? { ...x, quantity: Number(e.target.value) } : x))} />
               <Input type="number" step="0.01" placeholder="Unit cost" aria-label="Unit cost" value={r.unit_cost} onChange={e => setRows(rows.map((x, j) => j === i ? { ...x, unit_cost: Number(e.target.value) } : x))} />
               <button onClick={() => setRows(rows.filter((_, j) => j !== i))} aria-label="Remove row" className="col-span-2 sm:col-span-1 justify-self-end p-2 text-red-400 hover:text-red-600"><TrashIcon /></button>

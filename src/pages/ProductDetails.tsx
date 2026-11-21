@@ -26,6 +26,7 @@ const ProductDetails: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [qty, setQty] = useState(1);
   const [activeImg, setActiveImg] = useState(0);
+  const [variantId, setVariantId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -34,6 +35,9 @@ const ProductDetails: React.FC = () => {
       setProduct(p);
       if (p) {
         setActiveImg(0);
+        const vs = [...(p.variants || [])].sort((a, b) => a.sort_order - b.sort_order);
+        setVariantId((vs.find(v => v.stock_quantity > 0) || vs[0])?.id ?? null);
+        setQty(1);
         const rel = await getRelatedProducts(p);
         setRelated(rel);
       }
@@ -55,10 +59,13 @@ const ProductDetails: React.FC = () => {
   }
 
   const images = [...(product.images || [])].sort((a, b) => a.sort_order - b.sort_order);
-  const mainImg = images[activeImg]?.url || primaryImage(product);
+  const variants = [...(product.variants || [])].sort((a, b) => a.sort_order - b.sort_order);
+  const variant = variants.find(v => v.id === variantId) || null;
+  const stock = variant ? variant.stock_quantity : product.stock_quantity;
+  const mainImg = (variant?.image_url && activeImg < 0 ? variant.image_url : null) || images[activeImg]?.url || primaryImage(product);
   const price = effectivePrice(product);
-  const outOfStock = product.stock_quantity <= 0;
-  const lowStock = product.stock_quantity > 0 && product.stock_quantity <= product.low_stock_threshold;
+  const outOfStock = stock <= 0;
+  const lowStock = stock > 0 && stock <= product.low_stock_threshold;
   const wishlisted = isWishlisted(product.id);
   const discountPct = hasDiscount(product) ? Math.round((1 - (product.discount_price as number) / product.selling_price) * 100) : 0;
 
@@ -107,8 +114,28 @@ const ProductDetails: React.FC = () => {
           </div>
 
           <p className={`mt-2 text-sm font-bold ${outOfStock ? 'text-red-500' : lowStock ? 'text-sunshine-600' : 'text-mint-600'}`}>
-            {outOfStock ? 'Out of stock' : lowStock ? `Only ${product.stock_quantity} left — order soon!` : 'In stock & ready to ship'}
+            {outOfStock ? 'Out of stock' : lowStock ? `Only ${stock} left${variant ? ' in ' + variant.name : ''} — order soon!` : 'In stock & ready to ship'}
           </p>
+
+          {variants.length > 0 && (
+            <div className="mt-5">
+              <p className="text-sm font-extrabold text-ink-900 mb-2">Colour: <span className="text-mint-700">{variant?.name}</span></p>
+              <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Choose a colour">
+                {variants.map(v => {
+                  const out = v.stock_quantity <= 0;
+                  return (
+                    <button key={v.id} type="button" role="radio" aria-checked={v.id === variantId}
+                      onClick={() => { setVariantId(v.id); setQty(1); if (v.image_url) setActiveImg(-1); }}
+                      className={cn('inline-flex items-center gap-2 rounded-full border-2 px-3.5 py-2 text-sm font-extrabold transition', v.id === variantId ? 'border-mint-500 bg-mint-50 text-mint-800' : 'border-ink-100 bg-white text-ink-700 hover:border-mint-300', out && 'opacity-60')}>
+                      {v.color_hex && <span className="h-4 w-4 rounded-full border border-ink-200" style={{ background: v.color_hex }} />}
+                      <span className={out ? 'line-through' : ''}>{v.name}</span>
+                      {out && <span className="text-xs font-bold text-red-500">Sold out</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {product.description && (
             <p className="mt-5 text-ink-600 leading-relaxed whitespace-pre-line">{product.description}</p>
@@ -125,9 +152,9 @@ const ProductDetails: React.FC = () => {
             <div className="inline-flex items-center rounded-full border-2 border-ink-100 overflow-hidden">
               <button onClick={() => setQty(q => Math.max(1, q - 1))} className="px-3 sm:px-4 py-2.5 hover:bg-ink-50 text-ink-700"><Minus size={16} /></button>
               <span className="px-2 sm:px-5 py-2.5 font-extrabold text-ink-900 min-w-[2rem] sm:min-w-[3rem] text-center">{qty}</span>
-              <button onClick={() => setQty(q => Math.min(product.stock_quantity, q + 1))} disabled={outOfStock} className="px-3 sm:px-4 py-2.5 hover:bg-ink-50 text-ink-700 disabled:opacity-40"><Plus size={16} /></button>
+              <button onClick={() => setQty(q => Math.min(stock, q + 1))} disabled={outOfStock} className="px-3 sm:px-4 py-2.5 hover:bg-ink-50 text-ink-700 disabled:opacity-40"><Plus size={16} /></button>
             </div>
-            <Button size="lg" className="flex-1 sm:flex-none !px-3 sm:!px-7 whitespace-nowrap" disabled={outOfStock} onClick={() => { addToCart(product, qty); success(`${product.name} added to cart`); }}>
+            <Button size="lg" className="flex-1 sm:flex-none !px-3 sm:!px-7 whitespace-nowrap" disabled={outOfStock} onClick={() => { addToCart(product, qty, variant); success(`${product.name}${variant ? ' (' + variant.name + ')' : ''} added to cart`); }}>
               <ShoppingBag size={18} /> Add to Cart
             </Button>
             <button

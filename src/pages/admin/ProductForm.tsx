@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Trash2, Upload, Star, Sparkles, Image as ImageIcon } from 'lucide-react';
 import { optimizeImage, IMAGE_CACHE } from '../../lib/image';
+import { ColoursEditor, type ColourRow } from '../../components/admin/ColoursEditor';
 import { ProductPurchaseHistory } from '../../components/admin/ProductPurchaseHistory';
 import { supabase, type Product, type Category, type Supplier } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -50,6 +51,8 @@ const ProductForm: React.FC<Props> = ({ open, onClose, product, onSaved }) => {
   const [images, setImages] = useState<{ url: string; is_primary: boolean; id?: string }[]>([]);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [colours, setColours] = useState<ColourRow[]>([]);
+  const [origColourIds, setOrigColourIds] = useState<string[]>([]);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<any>({
     resolver: zodResolver(schema),
@@ -75,8 +78,18 @@ const ProductForm: React.FC<Props> = ({ open, onClose, product, onSaved }) => {
     } else {
       reset({ status: 'draft', stock_quantity: 0, low_stock_threshold: 5, supplier_cost: 0, landed_cost: 0, selling_price: 0, sku: generateSku(), tags: '' });
       setImages([]);
+      setColours([]); setOrigColourIds([]);
     }
   }, [open, product, reset]);
+
+  // load this product's colours when editing
+  useEffect(() => {
+    if (!open || !product?.id) return;
+    supabase.from('product_variants').select('*').eq('product_id', product.id).order('sort_order').then(({ data }) => {
+      const rows = (data || []).map((v: any): ColourRow => ({ key: v.id, id: v.id, name: v.name, color_hex: v.color_hex || '#cccccc', stock_quantity: String(v.stock_quantity), image_url: v.image_url || '' }));
+      setColours(rows); setOrigColourIds(rows.map(r => r.id!));
+    });
+  }, [open, product?.id]);
 
   const uploadFiles = async (files: FileList | null) => {
     if (!files?.length || !authUserId) return;
@@ -93,6 +106,11 @@ const ProductForm: React.FC<Props> = ({ open, onClose, product, onSaved }) => {
   };
 
   const save = async (data: any) => {
+    const named = colours.filter(c => c.name.trim());
+    const names = named.map(c => c.name.trim().toLowerCase());
+    if (colours.some(c => !c.name.trim())) return error('Give every colour a name, or remove the empty row.');
+    if (new Set(names).size !== names.length) return error('Two colours have the same name.');
+    if (named.some(c => !(parseInt(c.stock_quantity, 10) >= 0))) return error('Each colour needs a quantity of 0 or more.');
     setSaving(true);
     const payload = {
       name: data.name,
@@ -101,7 +119,7 @@ const ProductForm: React.FC<Props> = ({ open, onClose, product, onSaved }) => {
       category_id: data.category_id || null,
       selling_price: Number(data.selling_price),
       discount_price: data.discount_price === '' || data.discount_price == null || Number(data.discount_price) <= 0 ? null : Number(data.discount_price),
-      stock_quantity: Number(data.stock_quantity),
+      stock_quantity: named.length ? named.reduce((s, c) => s + (parseInt(c.stock_quantity, 10) || 0), 0) : Number(data.stock_quantity),
       low_stock_threshold: Number(data.low_stock_threshold),
       status: data.status,
       is_featured: !!data.is_featured,
@@ -131,6 +149,16 @@ const ProductForm: React.FC<Props> = ({ open, onClose, product, onSaved }) => {
       if (payload.stock_quantity > 0) {
         await supabase.from('inventory_transactions').insert({ product_id: productId, quantity_change: payload.stock_quantity, reason: 'purchase', notes: 'Opening stock' });
       }
+    }
+
+    // colours: update the ones that exist, add new ones, remove the ones taken out
+    const gone = origColourIds.filter(id => !named.some(c => c.id === id));
+    if (gone.length) await supabase.from('product_variants').delete().in('id', gone);
+    for (let i = 0; i < named.length; i++) {
+      const c = named[i];
+      const row = { product_id: productId, name: c.name.trim(), color_hex: c.color_hex || null, image_url: c.image_url || null, stock_quantity: parseInt(c.stock_quantity, 10) || 0, sort_order: i };
+      const { error: ve } = c.id ? await supabase.from('product_variants').update(row).eq('id', c.id) : await supabase.from('product_variants').insert(row);
+      if (ve) error(`Colour "${c.name}" could not be saved: ${ve.message}`);
     }
 
     const { error: costErr } = await supabase.from('product_costs').upsert({ product_id: productId, ...costs });
@@ -174,10 +202,14 @@ const ProductForm: React.FC<Props> = ({ open, onClose, product, onSaved }) => {
         <div className="rounded-3xl bg-mint-50 p-4 md:col-span-2">
           <p className="text-xs font-extrabold uppercase tracking-wide text-mint-700 mb-3">Inventory</p>
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Stock Quantity"><Input type="number" {...register('stock_quantity')} /></Field>
+            {colours.length > 0
+              ? <Field label="Stock Quantity" hint="Worked out from the colours below"><Input type="number" value={colours.reduce((s, c) => s + (parseInt(c.stock_quantity, 10) || 0), 0)} readOnly className="bg-ink-50" /></Field>
+              : <Field label="Stock Quantity"><Input type="number" {...register('stock_quantity')} /></Field>}
             <Field label="Low Stock Alert At"><Input type="number" {...register('low_stock_threshold')} /></Field>
           </div>
         </div>
+
+        <ColoursEditor rows={colours} onChange={setColours} imageUrls={images.map(i => i.url)} />
 
         {product?.id && <div className="md:col-span-2"><ProductPurchaseHistory productId={product.id} currency="LKR" /></div>}
 

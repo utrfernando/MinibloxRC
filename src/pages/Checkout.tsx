@@ -57,7 +57,7 @@ const Checkout: React.FC = () => {
     },
   });
 
-  const payload = useMemo(() => items.map(i => ({ product_id: i.product.id, quantity: i.quantity })), [items]);
+  const payload = useMemo(() => items.map(i => ({ product_id: i.product.id, variant_id: i.variant?.id ?? null, quantity: i.quantity })), [items]);
 
   if (!checkoutEnabled && !placedOrder) {
     return <EmptyState title="Checkout is paused" message={checkoutMessage} actionLabel="Back to Cart" onAction={() => navigate('/cart')} />;
@@ -201,8 +201,8 @@ const Checkout: React.FC = () => {
             <h2 className="font-display text-xl font-extrabold text-ink-900">Your Order</h2>
             <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
               {items.map(i => (
-                <div key={i.product.id} className="flex justify-between text-sm gap-3">
-                  <span className="text-ink-600 line-clamp-2">{i.product.name} <span className="text-ink-400">×{i.quantity}</span></span>
+                <div key={i.product.id + (i.variant?.id || '')} className="flex justify-between text-sm gap-3">
+                  <span className="text-ink-600 line-clamp-2">{i.product.name}{i.variant ? ` — ${i.variant.name}` : ''} <span className="text-ink-400">×{i.quantity}</span></span>
                   <span className="font-bold whitespace-nowrap">{formatCurrency(unitPrice(i.product) * i.quantity, currency)}</span>
                 </div>
               ))}

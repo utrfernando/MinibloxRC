@@ -75,6 +75,14 @@ const AdminOrders: React.FC = () => {
     if ((status === 'cancelled' || status === 'returned') && o.items?.length) {
       for (const item of o.items) {
         if (!item.product_id) continue;
+        if (item.variant_id) {
+          const { data: v } = await supabase.from('product_variants').select('stock_quantity').eq('id', item.variant_id).maybeSingle();
+          if (v) {
+            await supabase.from('product_variants').update({ stock_quantity: v.stock_quantity + item.quantity }).eq('id', item.variant_id);
+            await supabase.from('inventory_transactions').insert({ product_id: item.product_id, quantity_change: item.quantity, reason: 'return', reference_type: 'order', reference_id: o.id, notes: `Order ${o.order_number} ${status} (${item.variant_name || 'colour'})`, created_by: authUserId });
+            continue;
+          }
+        }
         const { data: prod } = await supabase.from('products').select('stock_quantity').eq('id', item.product_id).single();
         if (prod) {
           await supabase.from('products').update({ stock_quantity: prod.stock_quantity + item.quantity }).eq('id', item.product_id);
