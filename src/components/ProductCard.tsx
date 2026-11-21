@@ -7,6 +7,7 @@ import { useCart } from '../contexts/CartContext';
 import { useToast } from '../contexts/ToastContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { ProductImage } from './ui/Feedback';
+import { ShareButton } from './ShareButton';
 import { cn } from '../lib/utils';
 
 export const primaryImage = (p: Product): string | null => {
@@ -65,6 +66,8 @@ const ProductCard: React.FC<{ product: Product; index?: number }> = ({ product, 
       >
         <Heart size={18} fill={wishlisted ? 'currentColor' : 'none'} />
       </button>
+      <ShareButton productId={product.id} name={product.name} size={17}
+        className="absolute top-12 right-2 sm:top-[3.75rem] sm:right-3 z-10 h-9 w-9 sm:h-10 sm:w-10 rounded-full bg-white/90 text-ink-500 shadow-soft hover:text-mint-600" />
 
       <div className="flex flex-col flex-1 p-3 sm:p-4">
         <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wide sm:tracking-wider text-mint-600 truncate">{product.category?.name || 'MinibloxRC'}</p>

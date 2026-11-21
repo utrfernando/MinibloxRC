@@ -12,6 +12,7 @@ import ProductCard from '../components/ProductCard';
 import { ProductImage, Skeleton, EmptyState } from '../components/ui/Feedback';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
+import { ShareButton } from '../components/ShareButton';
 import { cn } from '../lib/utils';
 
 const ProductDetails: React.FC = () => {
@@ -164,6 +165,7 @@ const ProductDetails: React.FC = () => {
             >
               <Heart size={20} fill={wishlisted ? 'currentColor' : 'none'} />
             </button>
+            <ShareButton productId={product.id} name={product.name} size={20} className="p-3 sm:p-3.5 shrink-0 rounded-full border-2 border-ink-100 text-ink-500 hover:border-mint-300 hover:text-mint-600" />
           </div>
 
           {/* Perks */}
